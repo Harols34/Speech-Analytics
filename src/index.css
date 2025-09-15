@@ -1,0 +1,148 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 162 95% 33%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 160 92% 14%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 164 90% 54%;
+    --accent-foreground: 162 95% 33%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 162 95% 33%;
+    --radius: 0.75rem;
+    --sidebar-background: 260 25% 44%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 162 95% 33%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 164 90% 54%;
+    --sidebar-accent-foreground: 260 25% 44%;
+    --sidebar-border: 264 21% 35%;
+    --sidebar-ring: 162 95% 33%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 162 95% 33%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 160 92% 14%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 164 90% 54%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 162 95% 33%;
+    --sidebar-background: 160 92% 14%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 162 95% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 164 90% 54%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 160 92% 10%;
+    --sidebar-ring: 162 95% 33%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply w-full h-full m-0 p-0;
+    overflow: hidden;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Performance optimizations */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Optimized card styles */
+  .glass-card {
+    @apply bg-card shadow-sm border border-border rounded-lg;
+  }
+  
+  .card-hover {
+    @apply transition-shadow duration-200 hover:shadow-md;
+  }
+  
+  /* Button optimizations */
+  .button-primary {
+    @apply px-4 py-2 bg-primary text-primary-foreground rounded-md 
+           transition-colors duration-200 hover:opacity-90 
+           focus:outline-none focus:ring-2 focus:ring-primary/50 
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+  
+  /* Input optimizations */
+  .input-field {
+    @apply w-full px-3 py-2 rounded-md border border-input bg-background 
+           text-foreground transition-colors duration-200 
+           focus:outline-none focus:ring-2 focus:ring-primary/50;
+  }
+  
+  /* Loading optimizations */
+  .loading-overlay {
+    @apply bg-background/80 backdrop-blur-sm absolute inset-0 
+           flex items-center justify-center z-50;
+  }
+  
+  .spinner {
+    @apply animate-spin text-primary;
+  }
+  
+  /* Prevent layout shift */
+  .no-flicker {
+    @apply transform-gpu will-change-transform;
+  }
+
+  /* Chart colors for consistency */
+  .chart-primary { @apply text-primary; }
+  .chart-secondary { @apply text-secondary; }
+  .chart-accent { @apply text-accent; }
+  .chart-muted { @apply text-muted-foreground; }
+
+  /* Utility classes */
+  .full-screen { @apply w-full h-full; }
+  .full-width { @apply w-full; }
+  .full-height { @apply h-full; }
+}

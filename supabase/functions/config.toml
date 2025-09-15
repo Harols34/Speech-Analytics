@@ -1,0 +1,11 @@
+
+project_id = "calls-analyzer"
+
+[functions.process-call]
+verify_jwt = true
+
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.general-chat]
+verify_jwt = true
