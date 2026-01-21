@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS public.user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users NOT NULL,
-  transcription_model TEXT DEFAULT 'openai-whisper',
+  transcription_model TEXT DEFAULT 'gpt-4o-mini-transcribe',
   analysis_model TEXT DEFAULT 'gpt-4o',
   openai_key TEXT,
   speaker_diarization BOOLEAN DEFAULT TRUE,
