@@ -7,10 +7,15 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Clock } from "lucide-react";
 import PromptSelectionModal from "./PromptSelectionModal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useTranscriptionLimit, showTranscriptionLimitMessage } from "@/hooks/useAccountLimits";
 
 export default function CallUpload() {
   const [showPromptModal, setShowPromptModal] = useState(false);
+  
+  // Verificar límite de transcripción
+  const { data: transcriptionLimit } = useTranscriptionLimit();
+  const isTranscriptionBlocked = !!transcriptionLimit?.limite_alcanzado;
   
   const {
     files,
@@ -22,6 +27,13 @@ export default function CallUpload() {
 
   const handleUploadClick = () => {
     if (files.length === 0) return;
+    
+    // Verificar límite antes de permitir subida
+    if (isTranscriptionBlocked) {
+      showTranscriptionLimitMessage(transcriptionLimit);
+      return;
+    }
+    
     setShowPromptModal(true);
   };
 
@@ -36,6 +48,18 @@ export default function CallUpload() {
 
   return (
     <div className="space-y-6 animate-fade-in transition-all duration-300">
+      {/* Alerta de límite alcanzado */}
+      {isTranscriptionBlocked && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Límite de transcripción alcanzado</AlertTitle>
+          <AlertDescription>
+            Has alcanzado el límite mensual para cargar grabaciones de llamadas. 
+            Contacta al administrador para aumentar el límite y poder continuar subiendo archivos.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Información sobre formato de archivos y procesamiento en segundo plano */}
       <Alert variant="default" className="bg-muted/50">
         <AlertCircle className="h-4 w-4" />
@@ -68,7 +92,10 @@ export default function CallUpload() {
         </AlertDescription>
       </Alert>
       
-      <FileDropzone onDrop={addFiles} />
+      <FileDropzone 
+        onDrop={isTranscriptionBlocked ? () => {} : addFiles} 
+        disabled={isTranscriptionBlocked}
+      />
       
       {isUploading && (
         <div className="p-4 border rounded-lg bg-secondary/10 mb-4 transition-all duration-300">

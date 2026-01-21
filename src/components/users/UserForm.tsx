@@ -25,6 +25,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/context/AuthContext";
+import { useCustomRoles } from "@/hooks/useCustomRoles";
 
 const formSchema = z.object({
   email: z.string().email("Ingrese un correo electrónico válido").min(1, "El correo electrónico es requerido"),
@@ -38,6 +39,7 @@ export default function UserForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user: currentUser } = useAuth();
+  const { allRoles, isLoading: rolesLoading } = useCustomRoles();
   const isEditMode = Boolean(id);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -298,20 +300,27 @@ export default function UserForm() {
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
+                    disabled={rolesLoading}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar rol" />
+                        <SelectValue placeholder={rolesLoading ? "Cargando roles..." : "Seleccionar rol"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {currentUser?.role === "superAdmin" && (
-                        <SelectItem value="superAdmin">Super Administrador</SelectItem>
-                      )}
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="qualityAnalyst">Analista de Calidad</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="agent">Agente</SelectItem>
+                      {allRoles.map((role) => {
+                        // Solo mostrar superAdmin si el usuario actual es superAdmin
+                        if (role.value === 'superAdmin' && currentUser?.role !== 'superAdmin') {
+                          return null;
+                        }
+                        
+                        return (
+                          <SelectItem key={role.value} value={role.value}>
+                            {role.label}
+                            {role.isCustom && " (Personalizado)"}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <FormMessage />

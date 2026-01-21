@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -5,73 +6,115 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
+import { useEffectivePermissions } from "@/hooks/usePermissions";
 import { useAccount } from "@/context/AccountContext";
 import AccountSelector from "./AccountSelector";
-import { BarChart3, Phone, Users, Eye, Wrench, MessageSquare, Brain, Tag, FileText, User, Building2, Settings, ChevronLeft, ChevronRight, LogOut, Search } from "lucide-react";
+import { BarChart3, Phone, Users, Eye, Wrench, MessageSquare, Brain, Tag, FileText, User, Building2, Settings, ChevronLeft, ChevronRight, LogOut, Search, Shield, Receipt, GraduationCap, BookOpen } from "lucide-react";
 import { MenuItem } from "@/lib/types";
+
 const menuItems: MenuItem[] = [{
   name: "Análisis",
   href: "/analytics",
   icon: <BarChart3 className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "analytics"
 }, {
   name: "Llamadas",
   href: "/calls",
   icon: <Phone className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"],
+  module: "calls"
 }, {
   name: "Agentes",
   href: "/agents",
   icon: <Users className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "supervisor"]
+  role: ["superAdmin", "admin", "supervisor"],
+  module: "agents"
 }, {
   name: "Supervisión",
   href: "/workforce",
   icon: <Eye className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "supervisor"]
+  role: ["superAdmin", "admin", "supervisor"],
+  module: "workforce"
 }, {
   name: "Herramientas",
   href: "/tools",
   icon: <Wrench className="h-4 w-4" />,
-  role: ["superAdmin", "admin"]
+  role: ["superAdmin", "admin"],
+  module: "tools"
 }, {
   name: "Consulta IA",
   href: "/chat",
   icon: <MessageSquare className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "chat"
 }, {
   name: "Comportamientos",
   href: "/behaviors",
   icon: <Brain className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "behaviors"
 }, {
   name: "Tipificaciones",
   href: "/tipificaciones",
   icon: <Tag className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "tipificaciones"
 }, {
   name: "Prompts",
   href: "/prompts",
   icon: <FileText className="h-4 w-4" />,
-  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "prompts"
 }, {
   name: "Usuarios",
   href: "/users",
   icon: <User className="h-4 w-4" />,
-  role: ["superAdmin", "admin"]
+  role: ["superAdmin", "admin"],
+  module: "users"
 }, {
   name: "Cuentas",
   href: "/accounts",
   icon: <Building2 className="h-4 w-4" />,
-  role: ["superAdmin"]
+  role: ["superAdmin"],
+  module: "accounts"
+}, {
+  name: "Facturación",
+  href: "/facturacion",
+  icon: <Receipt className="h-4 w-4" />,
+  role: ["superAdmin"],
+  module: "facturacion"
+}, {
+  name: "Límites",
+  href: "/limits",
+  icon: <Shield className="h-4 w-4" />,
+  role: ["superAdmin"],
+  module: "limits"
+}, {
+  name: "Permisos",
+  href: "/permissions",
+  icon: <Shield className="h-4 w-4" />,
+  role: ["superAdmin"],
+  module: "permissions"
+}, {
+  name: "Admin Formación",
+  href: "/admin-formacion",
+  icon: <GraduationCap className="h-4 w-4" />,
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"],
+  module: "admin-formacion"
+}, {
+  name: "Formación",
+  href: "/formacion",
+  icon: <BookOpen className="h-4 w-4" />,
+  role: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"],
+  module: "formacion"
 }];
+
 export default function Sidebar() {
   const location = useLocation();
-  const {
-    user,
-    signOut
-  } = useAuth();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -80,16 +123,26 @@ export default function Sidebar() {
     }
   };
 
-  // Filter menu items based on user role
+  // Filtrar por permisos efectivos (user_permissions overridea role_permissions)
+  const { data: effectivePerms } = useEffectivePermissions();
+
   const filteredMenuItems = React.useMemo(() => {
     if (!user) return [];
-    return menuItems.filter(item => item.role.includes(user.role));
-  }, [user]);
+    if (user.role === 'superAdmin') return menuItems; // superAdmin ve todo
+    if (!effectivePerms) return [];
+    // Mostrar solo módulos con permiso explícito
+    return menuItems.filter(item => {
+      const perm = effectivePerms.find(p => p.module_name === (item as any).module);
+      return !!perm && perm.can_access === true;
+    });
+  }, [user, effectivePerms]);
+
   if (!user) {
     return <div className="w-64 border-r bg-gray-50/40 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>;
   }
+
   return <div className={cn("border-r bg-gray-50/40 transition-all duration-300 flex flex-col h-full", collapsed ? "w-16" : "w-64")}>
       {/* Header */}
       <div className="flex h-14 items-center border-b lg:h-[60px] lg:px-6 shrink-0 px-[17px] mx-[-6px]">

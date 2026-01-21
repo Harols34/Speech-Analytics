@@ -22,7 +22,7 @@ export type AudioSettings = {
 };
 
 const defaultSettings: AudioSettings = {
-  model: "whisper-1",
+  model: "gpt-4o-mini-transcribe",
   language: "es-ES",
   timestamps: true,
   punctuation: true,

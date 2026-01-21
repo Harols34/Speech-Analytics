@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { X, Filter, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 
 export interface CallFilters {
   status: string[];
@@ -15,6 +16,7 @@ export interface CallFilters {
   agent: string[];
   dateRange: string;
   product: string[];
+  query: string;
 }
 
 interface CallListFiltersProps {
@@ -61,7 +63,7 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
 
   // Memoize active filters count to prevent unnecessary re-calculations
   const activeFiltersCount = useMemo(() => {
-    const { status, sentiment, result, agent, dateRange, product } = filters;
+    const { status, sentiment, result, agent, dateRange, product, query } = filters;
     let count = 0;
     if (status.length > 0) count++;
     if (sentiment.length > 0) count++;
@@ -69,6 +71,7 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
     if (agent.length > 0) count++;
     if (dateRange && dateRange !== "all") count++;
     if (product.length > 0) count++;
+    if (query && query.trim().length > 0) count++;
     return count;
   }, [filters]);
 
@@ -101,7 +104,8 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
       result: [],
       agent: [],
       dateRange: "all",
-      product: []
+      product: [],
+      query: ""
     };
     onFiltersChange(clearedFilters);
     console.log("Aplicando filtros:", clearedFilters);
@@ -112,6 +116,11 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
       onFiltersChange({
         ...filters,
         dateRange: "all"
+      });
+    } else if (filterKey === "query") {
+      onFiltersChange({
+        ...filters,
+        query: ""
       });
     } else if (Array.isArray(filters[filterKey]) && value) {
       const currentValues = filters[filterKey] as string[];
@@ -218,6 +227,16 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
               />
             </Badge>
           )}
+
+          {filters.query && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              Búsqueda: {filters.query}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => removeFilter("query")}
+              />
+            </Badge>
+          )}
           
           <Button 
             variant="ghost" 
@@ -234,7 +253,7 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
       {/* Filter Panel */}
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
+          <Button variant="outline" className="w-full justify-between py-2">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Filtros
@@ -249,8 +268,29 @@ export default function CallListFilters({ filters, onFiltersChange, agents }: Ca
         
         <CollapsibleContent>
           <Card className="mt-2">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Búsqueda</Label>
+                  <Input 
+                    value={filters.query}
+                    onChange={(e) => onFiltersChange({ ...filters, query: e.target.value })}
+                    placeholder="Título, agente, resumen..."
+                  />
+                  <div className="flex gap-2 flex-wrap text-xs text-muted-foreground">
+                    <span>Rápidos:</span>
+                    {dateRangeOptions.filter(o => o.value !== 'all').map(opt => (
+                      <button 
+                        key={opt.value}
+                        className={`px-2 py-1 rounded border ${filters.dateRange === opt.value ? 'bg-muted' : ''}`}
+                        onClick={() => handleDateRangeChange(opt.value)}
+                        type="button"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {renderFilterSelect("Estado", "status", statusOptions)}
                 {renderFilterSelect("Sentimiento", "sentiment", sentimentOptions)}
                 {renderFilterSelect("Resultado", "result", resultOptions)}

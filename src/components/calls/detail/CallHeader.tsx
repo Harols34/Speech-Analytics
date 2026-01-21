@@ -32,7 +32,7 @@ export default function CallHeader({ call }: CallHeaderProps) {
         {call.result && (
           <>
             <span>•</span>
-            <Badge variant={call.result === "venta" ? "success" : "secondary"}>
+            <Badge variant={call.result === "venta" ? "default" : "secondary"} className={call.result === "venta" ? "bg-green-600 hover:bg-green-700" : ""}>
               {call.result === "venta" ? "Venta" : "No venta"}
             </Badge>
           </>

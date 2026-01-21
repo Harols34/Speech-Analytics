@@ -15,6 +15,7 @@ import CallDetailSkeleton from "./CallDetailSkeleton";
 import CallNotFound from "./CallNotFound";
 import CallChatDialog from "./CallChatDialog";
 import { useCallData } from "@/hooks/useCallData";
+import { useAuth } from "@/context/AuthContext";
 
 // Define a form value type for handling the non-overlapping string values
 type FormResultValue = "not_selected" | "venta" | "no venta";
@@ -30,6 +31,7 @@ export default function CallDetail() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showChatDialog, setShowChatDialog] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const { user } = useAuth();
 
   const handleCallUpdate = async (updatedCall: CallUpdateInput) => {
     if (!call || !id) return;
@@ -111,10 +113,7 @@ export default function CallDetail() {
         // Success message and close dialog
         toast.success("Llamada actualizada correctamente", { id: "update-call" });
         
-        // Refresh the page to ensure all data is updated correctly
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        // No full page reload; UI already reflects changes via state updates
       } else {
         // If no data returned but no error, update with provided data
         // Convert FormResultValue to database value for local state
@@ -158,24 +157,26 @@ export default function CallDetail() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-start">
         <CallHeader call={call} />
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowChatDialog(true)}
-            className="flex items-center"
-          >
-            <MessageSquare className="h-4 w-4 mr-2" /> Consultar
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowEditDialog(true)}
-            disabled={isUpdating}
-          >
-            <Edit className="h-4 w-4 mr-2" /> Editar
-          </Button>
-        </div>
+        {user?.role !== 'agent' && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowChatDialog(true)}
+              className="flex items-center"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" /> Consultar
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowEditDialog(true)}
+              disabled={isUpdating}
+            >
+              <Edit className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          </div>
+        )}
       </div>
 
       <AudioPlayer audioUrl={call.audioUrl} filename={call.filename} />

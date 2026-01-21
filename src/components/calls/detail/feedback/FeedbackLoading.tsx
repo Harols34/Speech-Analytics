@@ -44,10 +44,7 @@ export default function FeedbackLoading({
               <p className="text-sm mt-1">
                 Verifique que:
                 <ul className="list-disc pl-5 mt-1">
-                  <li>
-                    La variable de entorno "API_DE_OPENAI" esté configurada en los secretos 
-                    de las Edge Functions de Supabase.
-                  </li>
+                  <li>El Modelo_convert-IA esté configurado correctamente en el backend.</li>
                   <li>Existan comportamientos activos en el sistema.</li>
                   <li>La transcripción de la llamada esté completa.</li>
                 </ul>

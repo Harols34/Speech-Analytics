@@ -35,6 +35,8 @@ const AccountSelector: React.FC = () => {
   const handleAccountChange = (accountId: string) => {
     console.log("Account changed to:", accountId);
     setSelectedAccountId(accountId);
+    // Trigger interface refresh via event instead of page reload
+    window.dispatchEvent(new CustomEvent('accountChanged', { detail: accountId }));
   };
 
   return (

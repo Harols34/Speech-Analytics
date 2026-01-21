@@ -13,9 +13,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PromptType } from "@/hooks/usePrompts";
+import { usePromptImprove } from "@/hooks/usePromptImprove";
+import { PromptComparisonDialog } from "@/components/prompts/PromptComparisonDialog";
 
 // Define el esquema de validación con Zod
 const formSchema = z.object({
@@ -28,9 +30,16 @@ const formSchema = z.object({
 export default function PromptForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonData, setComparisonData] = useState<{
+    originalContent: string;
+    improvedContent: string;
+  } | null>(null);
+  
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
+  const { improvePrompt, isImproving } = usePromptImprove();
   const isEditMode = Boolean(id);
 
   // Initialize the form with default values
@@ -98,6 +107,45 @@ export default function PromptForm() {
     fetchPrompt();
   }, [id, isEditMode, form]);
 
+  const handleImprovePrompt = async () => {
+    const currentContent = form.getValues("content");
+    const currentType = form.getValues("type");
+    const currentName = form.getValues("name") || "Nuevo prompt";
+
+    if (!currentContent.trim()) {
+      toast.error("Primero escribe algo de contenido para mejorar");
+      return;
+    }
+
+    const result = await improvePrompt({
+      content: currentContent,
+      type: currentType,
+      name: currentName
+    });
+
+    if (result?.success) {
+      setComparisonData({
+        originalContent: result.originalContent,
+        improvedContent: result.improvedContent
+      });
+      setShowComparison(true);
+    }
+  };
+
+  const handleAcceptImprovement = () => {
+    if (comparisonData) {
+      form.setValue("content", comparisonData.improvedContent);
+      toast.success("Prompt mejorado aplicado");
+    }
+    setShowComparison(false);
+    setComparisonData(null);
+  };
+
+  const handleRejectImprovement = () => {
+    setShowComparison(false);
+    setComparisonData(null);
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
@@ -154,148 +202,182 @@ export default function PromptForm() {
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        <div className="flex items-start gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("/prompts")}
-            className="mt-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">
-              {isEditMode ? "Editar Prompt" : "Nuevo Prompt"}
-            </h2>
-            <p className="text-muted-foreground">
-              {isEditMode
-                ? "Actualiza los detalles del prompt"
-                : "Crea un nuevo prompt para análisis y resúmenes de llamadas"}
-            </p>
+    <>
+      <Layout>
+        <div className="space-y-6">
+          <div className="flex items-start gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate("/prompts")}
+              className="mt-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">
+                {isEditMode ? "Editar Prompt" : "Nuevo Prompt"}
+              </h2>
+              <p className="text-muted-foreground">
+                {isEditMode
+                  ? "Actualiza los detalles del prompt"
+                  : "Crea un nuevo prompt para análisis y resúmenes de llamadas"}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <Card className="max-w-3xl mx-auto">
-          <CardContent className="p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nombre del prompt" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Nombre descriptivo para identificar el prompt.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
+          <Card className="max-w-3xl mx-auto">
+            <CardContent className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona el tipo de prompt" />
-                          </SelectTrigger>
+                          <Input placeholder="Nombre del prompt" {...field} />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="summary">Resumen</SelectItem>
-                          <SelectItem value="feedback">Feedback</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Selecciona si este prompt es para generar resúmenes o feedback.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contenido</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Escribe el contenido del prompt..."
-                          className="min-h-32 resize-y"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        El texto del prompt que se usará para generar respuestas.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Activo</FormLabel>
                         <FormDescription>
-                          Determina si este prompt está disponible para ser utilizado.
+                          Nombre descriptivo para identificar el prompt.
                         </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/prompts")}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : isEditMode ? (
-                      "Actualizar"
-                    ) : (
-                      "Crear"
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
-    </Layout>
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona el tipo de prompt" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="summary">Resumen</SelectItem>
+                            <SelectItem value="feedback">Feedback</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Selecciona si este prompt es para generar resúmenes o feedback.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Contenido</FormLabel>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleImprovePrompt}
+                            disabled={isImproving}
+                            className="ml-2"
+                          >
+                            {isImproving ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Sparkles className="h-4 w-4 mr-2" />
+                            )}
+                            {isImproving ? "Mejorando..." : "Mejorar con IA"}
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Escribe el contenido del prompt..."
+                            className="min-h-32 resize-y"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          El texto del prompt que se usará para generar respuestas. Usa el botón "Mejorar con IA" 
+                          para optimizar automáticamente tu prompt con enfoques de ventas, comercial e insights estratégicos.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="active"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Activo</FormLabel>
+                          <FormDescription>
+                            Determina si este prompt está disponible para ser utilizado.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/prompts")}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : isEditMode ? (
+                        "Actualizar"
+                      ) : (
+                        "Crear"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+
+      {/* Diálogo de Comparación */}
+      {comparisonData && (
+        <PromptComparisonDialog
+          open={showComparison}
+          onOpenChange={setShowComparison}
+          originalContent={comparisonData.originalContent}
+          improvedContent={comparisonData.improvedContent}
+          promptName={form.getValues("name") || "Nuevo prompt"}
+          promptType={form.getValues("type")}
+          onAccept={handleAcceptImprovement}
+          onReject={handleRejectImprovement}
+        />
+      )}
+    </>
   );
 }

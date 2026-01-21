@@ -1,3 +1,4 @@
+
 import React from "react";
 
 export interface User {
@@ -5,7 +6,7 @@ export interface User {
   email: string;
   name?: string;
   full_name?: string;
-  role: "superAdmin" | "admin" | "qualityAnalyst" | "supervisor" | "agent";
+  role: "superAdmin" | "admin" | "qualityAnalyst" | "supervisor" | "agent" | "backOffice";
   avatar?: string;
   avatar_url?: string;
   dailyQueryLimit: number;
@@ -27,6 +28,32 @@ export interface UserAccount {
   id: string;
   user_id: string;
   account_id: string;
+  created_at: string;
+}
+
+export interface AccountLimit {
+  id: string;
+  account_id: string;
+  limite_horas: number;
+  limite_consultas: number;
+  limite_minutos_entrenamiento: number;
+  limite_mensajes_chat: number;
+  horas_adicionales: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsageTracking {
+  id: string;
+  account_id: string;
+  tipo: "transcripcion" | "chat";
+  subtipo?: "chat_llamada" | "chat_general";
+  cantidad: number;
+  tokens_used?: number;
+  modelo_openai?: string;
+  costo_usd?: number;
+  fecha: string;
+  origen?: string;
   created_at: string;
 }
 
@@ -131,11 +158,13 @@ export interface DashboardCard {
   icon?: React.ReactNode;
 }
 
+// Menu item configuration for sidebar navigation
 export interface MenuItem {
   name: string;
   href: string;
   icon: React.ReactNode;
   role: User["role"][];
+  module?: string;
 }
 
 export interface ChatMessage {

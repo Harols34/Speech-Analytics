@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from "react";
+
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Check, X, RefreshCcw, Trash2 } from "lucide-react";
+import { Check, X, RefreshCcw, Trash2, AlertTriangle, Clock, MessageSquare } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import CallUploadButton from "./CallUploadButton";
@@ -11,13 +12,49 @@ import { CallTable } from "./CallTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { useAuth } from "@/context/AuthContext";
+import { useAccount } from "@/context/AccountContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { useDetailedMetrics } from "@/hooks/useDetailedMetrics";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function CallList() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isMultiDeleteDialogOpen, setIsMultiDeleteDialogOpen] = useState(false);
+  const [isCleanPlatformDialogOpen, setIsCleanPlatformDialogOpen] = useState(false);
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<number>(20);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  
+  const { user } = useAuth();
+  const { selectedAccountId } = useAccount();
+  const isSuperAdmin = user?.role === 'superAdmin';
+  
+  // Metrics for consumption with month navigation
+  const [metricsMonth, setMetricsMonth] = useState<Date>(new Date());
+  const metricsFrom = format(startOfMonth(metricsMonth), 'yyyy-MM-dd');
+  const metricsTo = format(endOfMonth(metricsMonth), 'yyyy-MM-dd');
+  const { data: metricsData, isLoading: loadingMetrics, refetch: refetchMetrics } = useDetailedMetrics(selectedAccountId || "all", metricsFrom, metricsTo);
+  const accountMetrics = metricsData && metricsData.length > 0 ? metricsData[0] : null;
+
+  const goPrevMonth = useCallback(() => {
+    const d = new Date(metricsMonth);
+    d.setMonth(d.getMonth() - 1);
+    setMetricsMonth(d);
+  }, [metricsMonth]);
+
+  const goNextMonth = useCallback(() => {
+    const d = new Date(metricsMonth);
+    d.setMonth(d.getMonth() + 1);
+    setMetricsMonth(d);
+  }, [metricsMonth]);
+
+  useEffect(() => {
+    refetchMetrics();
+  }, [metricsMonth, selectedAccountId, refetchMetrics]);
   
   // Initialize filters with proper structure
   const [filters, setFilters] = useState<CallFilters>({
@@ -26,8 +63,30 @@ export default function CallList() {
     result: [],
     agent: [],
     dateRange: "all",
-    product: []
+    product: [],
+    query: ""
   });
+
+  // Persist filters per account
+  const storageKey = selectedAccountId ? `calls_filters_${selectedAccountId}` : null;
+
+  useEffect(() => {
+    if (storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as CallFilters;
+          setFilters(parsed);
+        } catch {}
+      }
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify(filters));
+    }
+  }, [filters, storageKey]);
   
   const {
     calls,
@@ -42,8 +101,19 @@ export default function CallList() {
     deleteCall,
     deleteMultipleCalls,
     toggleCallSelection,
-    toggleAllCalls
+    toggleAllCalls,
+    cleanPlatform
   } = useCallList();
+
+  // Listen for account changes and refresh data
+  useEffect(() => {
+    const handleAccountChange = () => {
+      fetchCalls();
+    };
+    
+    window.addEventListener('accountChanged', handleAccountChange);
+    return () => window.removeEventListener('accountChanged', handleAccountChange);
+  }, [fetchCalls]);
 
   // Get agents for filter options
   const agents = useMemo(() => {
@@ -83,7 +153,8 @@ export default function CallList() {
     console.log("Filter change detected:", newFilters);
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page on filter change
-  }, []);
+    fetchCalls(newFilters, true);
+  }, [fetchCalls]);
 
   const handlePageSizeChange = useCallback((value: string) => {
     const newSize = parseInt(value);
@@ -200,12 +271,13 @@ export default function CallList() {
               isLoading={isLoading} 
               selectedCalls={selectedCalls} 
               multiSelectMode={multiSelectMode} 
-              onDeleteCall={(id) => {
+              onDeleteCall={isSuperAdmin ? (id) => {
                 setSelectedCallId(id);
                 setIsDeleteDialogOpen(true);
-              }} 
+              } : undefined} 
               onToggleCallSelection={toggleCallSelection} 
-              onToggleAllCalls={toggleAllCalls} 
+              onToggleAllCalls={toggleAllCalls}
+              isSuperAdmin={isSuperAdmin}
             />
           </ScrollArea>
         </div>
@@ -270,7 +342,7 @@ export default function CallList() {
         </div>
       </>
     );
-  }, [isLoading, calls.length, error, currentCalls, selectedCalls, multiSelectMode, toggleCallSelection, toggleAllCalls, handleRefresh, pageSize, handlePageSizeChange, totalItems, startIndex, endIndex, pageNumbers, currentPage, totalPages, handlePageChange]);
+  }, [isLoading, calls.length, error, currentCalls, selectedCalls, multiSelectMode, toggleCallSelection, toggleAllCalls, handleRefresh, pageSize, handlePageSizeChange, totalItems, startIndex, endIndex, pageNumbers, currentPage, totalPages, handlePageChange, isSuperAdmin]);
 
   return (
     <div className="space-y-4 component-fade">
@@ -281,15 +353,17 @@ export default function CallList() {
         <div className="flex gap-2">
           {multiSelectMode ? (
             <>
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={() => setIsMultiDeleteDialogOpen(true)} 
-                disabled={selectedCalls.length === 0}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar ({selectedCalls.length})
-              </Button>
+              {isSuperAdmin && (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setIsMultiDeleteDialogOpen(true)} 
+                  disabled={selectedCalls.length === 0}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar ({selectedCalls.length})
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -301,14 +375,16 @@ export default function CallList() {
             </>
           ) : (
             <>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setMultiSelectMode(true)}
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Seleccionar
-              </Button>
+              {isSuperAdmin && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setMultiSelectMode(true)}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Seleccionar
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -318,65 +394,185 @@ export default function CallList() {
                 <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
+              {isSuperAdmin && (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setIsCleanPlatformDialogOpen(true)}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Limpiar Todo
+                </Button>
+              )}
               <CallListExport 
                 selectedCalls={selectedCalls.length > 0 ? calls.filter(call => selectedCalls.includes(call.id)) : undefined} 
                 filteredCalls={calls} 
               />
-              <CallUploadButton />
+              {user?.role !== 'agent' && <CallUploadButton />}
             </>
           )}
         </div>
       </div>
 
-      <CallListFilters 
-        filters={filters}
-        onFiltersChange={handleFilterChange}
-        agents={agents}
-      />
+      {user?.role !== 'agent' && (
+        <CallListFilters 
+          filters={filters}
+          onFiltersChange={handleFilterChange}
+          agents={agents}
+        />
+      )}
+
+      {/* Consumo - Speech analytics (Transcripción y Consultas de Chatbot) */}
+      <Collapsible defaultOpen={false}>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-3">
+            <CardTitle className="text-base">Consumo</CardTitle>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="hover-scale">
+                Ver/Ocultar
+              </Button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="py-3 px-3">
+              <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground">
+                <button className="px-2 py-1 rounded border" onClick={goPrevMonth} type="button">◀</button>
+                <span>{format(metricsMonth, 'MMMM yyyy')}</span>
+                <button className="px-2 py-1 rounded border" onClick={goNextMonth} type="button">▶</button>
+              </div>
+              {loadingMetrics ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-14 w-full" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Speech analytics</div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-sm">
+                        <Clock className="h-3 w-3" />
+                        Transcripción
+                      </Label>
+                      <Progress 
+                        value={Math.min(accountMetrics?.porcentaje_transcripcion || 0, 100)} 
+                        className={`h-1.5 ${(accountMetrics?.porcentaje_transcripcion || 0) >= 100 ? 'bg-red-100' : (accountMetrics?.porcentaje_transcripcion || 0) >= 90 ? 'bg-yellow-100' : ''}`}
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>{(accountMetrics?.porcentaje_transcripcion || 0).toFixed(1)}% utilizado</span>
+                        {accountMetrics && (
+                          <span>
+                            {(accountMetrics.uso_transcripcion_mes || 0).toFixed(2)} / {(accountMetrics.limite_horas + (accountMetrics.horas_adicionales || 0))} horas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-sm">
+                        <MessageSquare className="h-3 w-3" />
+                        Consultas de Chatbot
+                      </Label>
+                      <Progress 
+                        value={Math.min(accountMetrics?.porcentaje_consultas || 0, 100)} 
+                        className={`h-1.5 ${(accountMetrics?.porcentaje_consultas || 0) >= 100 ? 'bg-red-100' : (accountMetrics?.porcentaje_consultas || 0) >= 90 ? 'bg-yellow-100' : ''}`}
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                        <span>{(accountMetrics?.porcentaje_consultas || 0).toFixed(1)}% utilizado</span>
+                        {accountMetrics && (
+                          <span>
+                            {(accountMetrics.uso_consultas_mes || 0)} / {(accountMetrics.limite_consultas || 0)} consultas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <div className="transition-all duration-300">
         {renderContent()}
       </div>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. ¿Deseas eliminar esta llamada?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (selectedCallId) {
-                deleteCall(selectedCallId);
-              }
-              setIsDeleteDialogOpen(false);
-              setSelectedCallId(null);
-            }}>
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Only show delete dialogs for superAdmin */}
+      {isSuperAdmin && (
+        <>
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. ¿Deseas eliminar esta llamada?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => {
+                  if (selectedCallId) {
+                    deleteCall(selectedCallId);
+                  }
+                  setIsDeleteDialogOpen(false);
+                  setSelectedCallId(null);
+                }}>
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <AlertDialog open={isMultiDeleteDialogOpen} onOpenChange={setIsMultiDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vas a eliminar {selectedCalls.length} llamadas. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteMultipleCalls}>
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog open={isMultiDeleteDialogOpen} onOpenChange={setIsMultiDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Vas a eliminar {selectedCalls.length} llamadas. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={deleteMultipleCalls}>
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={isCleanPlatformDialogOpen} onOpenChange={setIsCleanPlatformDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive">⚠️ Limpiar Toda la Plataforma</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <div className="space-y-2">
+                    <p className="font-semibold">Esta acción eliminará PERMANENTEMENTE:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Todas las llamadas</li>
+                      <li>Todos los mensajes de chat</li>
+                      <li>Todos los feedbacks</li>
+                      <li>Todo el historial de uso</li>
+                    </ul>
+                    <p className="text-destructive font-semibold mt-3">
+                      Esta acción NO se puede deshacer. ¿Estás completamente seguro?
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={cleanPlatform}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Sí, Limpiar Todo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   );
 }

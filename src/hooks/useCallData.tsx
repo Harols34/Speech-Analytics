@@ -123,7 +123,8 @@ export function useCallData(id: string | undefined) {
           reason: callData.reason || "",
           tipificacionId: callData.tipificacion_id,
           speaker_analysis: callData.speaker_analysis || null,
-          statusSummary: callData.status_summary || ""
+          statusSummary: callData.status_summary || "",
+          account_id: callData.account_id
         };
         
         let segments: any[] = [];
@@ -138,15 +139,63 @@ export function useCallData(id: string | undefined) {
           } else {
             console.log("Transcription does not appear to be in timestamped format");
             const lines = transcriptionText.split('\n').filter(line => line.trim());
-            segments = lines.map((line, index) => ({
-              text: line.trim(),
-              speaker: index % 2 === 0 ? 'agent' : 'client',
-              start: index * 5,
-              end: (index + 1) * 5
-            }));
+            segments = lines.map((line, index) => {
+              const raw = line.trim();
+              console.log(`🔍 Parsing line ${index}: "${raw.substring(0, 80)}..."`);
+              
+              // Detectar prefijos explícitos de manera más amplia
+              const prefMatch = raw.match(/^(?:\[[\d:]+\]\s*)?(Asesor|Cliente|Silencio)\s*:\s*(.+)$/i);
+              if (prefMatch) {
+                const role = prefMatch[1].toLowerCase();
+                const text = prefMatch[2].trim();
+                const speaker: 'agent' | 'client' | 'silence' = role === 'cliente' ? 'client' : role === 'asesor' ? 'agent' : 'silence';
+                console.log(`✅ Explicit role detected: ${role} -> ${speaker}`);
+                return { text, speaker, start: index * 5, end: (index + 1) * 5, explicit: true };
+              }
+              
+              // Si contiene ":" pero no es un prefijo conocido, revisar contenido
+              if (raw.includes(':')) {
+                const colonIndex = raw.indexOf(':');
+                const beforeColon = raw.substring(0, colonIndex).toLowerCase().trim();
+                const afterColon = raw.substring(colonIndex + 1).trim();
+                
+                // Verificar si antes del ":" hay algo que indique el hablante
+                if (beforeColon.includes('cliente') || beforeColon.includes('client')) {
+                  console.log(`✅ Cliente detected from colon pattern: "${beforeColon}"`);
+                  return { text: afterColon, speaker: 'client', start: index * 5, end: (index + 1) * 5, explicit: true };
+                } else if (beforeColon.includes('asesor') || beforeColon.includes('agente') || beforeColon.includes('agent')) {
+                  console.log(`✅ Asesor detected from colon pattern: "${beforeColon}"`);
+                  return { text: afterColon, speaker: 'agent', start: index * 5, end: (index + 1) * 5, explicit: true };
+                } else if (beforeColon.includes('silencio') || beforeColon.includes('silence')) {
+                  console.log(`✅ Silencio detected from colon pattern: "${beforeColon}"`);
+                  return { text: afterColon, speaker: 'silence', start: index * 5, end: (index + 1) * 5, explicit: true };
+                }
+              }
+              
+              // Fallback: alternancia simple Cliente-Asesor en lugar de defaultear a asesor
+              const text = stripSpeakerAndTimestamp(raw);
+              const speaker: 'agent' | 'client' | 'silence' = index % 2 === 0 ? 'client' : 'agent'; // Empezar con cliente
+              console.log(`⚠️ Fallback alternation for line ${index}: ${speaker}`);
+              return { text, speaker, start: index * 5, end: (index + 1) * 5, explicit: false };
+            });
           }
         } else if (Array.isArray(callData.transcription)) {
           segments = callData.transcription.filter(item => item && typeof item === 'object' && item.text);
+        }
+
+        // Verificar si ya hay roles explícitos bien distribuidos antes de normalizar
+        const hasExplicitRoles = segments.some((s: any) => s.explicit);
+        const clientSegments = segments.filter((s: any) => s.speaker === 'client').length;
+        const agentSegments = segments.filter((s: any) => s.speaker === 'agent').length;
+        
+        console.log(`📊 Role distribution: ${clientSegments} client, ${agentSegments} agent, hasExplicit: ${hasExplicitRoles}`);
+        
+        // Solo normalizar si no hay roles explícitos y hay desbalance extremo
+        if (!hasExplicitRoles && (clientSegments === 0 || agentSegments === 0) && segments.length > 2) {
+          console.log('🔄 Applying normalization due to missing roles...');
+          segments = normalizeDiarization(segments);
+        } else {
+          console.log('✅ Keeping explicit roles as-is');
         }
         
         // Load feedback data with better error handling
@@ -250,6 +299,20 @@ export function useCallData(id: string | undefined) {
     console.log(`Parsing ${lines.length} lines from transcription`);
     
     lines.forEach((line, index) => {
+      // Primero, si la parte después del timestamp indica Silencio
+      const silenceFirst = line.match(/^\[(\d+):(\d+)\]\s*Silencio:\s*(\d+)/i);
+      if (silenceFirst) {
+        const [, minutes, seconds, duration] = silenceFirst;
+        const startTime = parseInt(minutes) * 60 + parseInt(seconds);
+        segments.push({
+          text: `Silencio: ${duration} segundos`,
+          speaker: 'silence',
+          start: startTime,
+          end: startTime + parseInt(duration),
+          explicit: true
+        });
+        return;
+      }
       const timestampMatch = line.match(/^\[(\d+):(\d+)\]\s*(.+?):\s*(.+)$/);
       if (timestampMatch) {
         const [, minutes, seconds, speaker, text] = timestampMatch;
@@ -266,10 +329,11 @@ export function useCallData(id: string | undefined) {
         const startTime = parseInt(minutes) * 60 + parseInt(seconds);
         
         segments.push({
-          text: text.trim(),
+          text: stripSpeakerAndTimestamp(text.trim()),
           speaker: speakerType,
           start: startTime,
-          end: startTime + 5
+          end: startTime + 5,
+          explicit: true
         });
       } else if (line.includes('Silencio:')) {
         const silenceMatch = line.match(/^\[(\d+):(\d+)\]\s*Silencio:\s*(\d+)/);
@@ -281,25 +345,103 @@ export function useCallData(id: string | undefined) {
             text: `Silencio: ${duration} segundos`,
             speaker: 'silence',
             start: startTime,
-            end: startTime + parseInt(duration)
+            end: startTime + parseInt(duration),
+            explicit: true
           });
         }
       } else if (line.trim() && !line.includes('No hay transcripción disponible')) {
         let speakerType = 'agent';
-        if (line.toLowerCase().includes('cliente:')) {
+        const lower = line.toLowerCase();
+        if (lower.includes('cliente:')) {
           speakerType = 'client';
+        } else if (lower.includes('silencio:')) {
+          speakerType = 'silence';
         }
         
         segments.push({
-          text: line.trim(),
+          text: stripSpeakerAndTimestamp(line.trim()),
           speaker: speakerType,
           start: index * 5,
-          end: (index + 1) * 5
+          end: (index + 1) * 5,
+          explicit: /^(asesor|agente|cliente|silencio)\s*:/i.test(line.trim())
         });
       }
     });
     
     console.log("Parsed", segments.length, "segments from timestamped transcription");
+    return segments;
+  }
+
+  // Limpia prefijos redundantes en texto como "Asesor:"/"Cliente:" y timestamps "[mm:ss]"
+  function stripSpeakerAndTimestamp(input: string): string {
+    if (!input) return input;
+    let out = input.replace(/^\s*\[(\d+):(\d+)\]\s*/i, '');
+    out = out.replace(/^\s*(asesor|agente|cliente)\s*:\s*/i, '');
+    return out.trim();
+  }
+
+  // Normaliza la diarización: si sólo hay un hablante detectado, intenta separar
+  // basándose en señales fuertes (pregunta → respuesta corta) y ack-words.
+  function normalizeDiarization(rawSegments: any[]): any[] {
+    if (!Array.isArray(rawSegments) || rawSegments.length === 0) return rawSegments;
+    const segments = [...rawSegments].sort((a, b) => (a.start || 0) - (b.start || 0));
+    const spoken = segments.filter(s => s && s.speaker !== 'silence');
+    const speakerSet = new Set(spoken.map(s => s.speaker));
+    if (speakerSet.size >= 2) return segments; // ya hay 2
+
+    // Si no hay texto hablado o hay 1 solo segmento, no forzar
+    if (spoken.length <= 1) return segments;
+
+    const present: 'agent' | 'client' = (spoken[0]?.speaker === 'client') ? 'client' : 'agent';
+    const opposite = (present === 'agent') ? 'client' : 'agent';
+    const ackWords = ['sí','no','ok','okay','bueno','gracias','perfecto','está bien','de acuerdo','claro'];
+
+    let flips = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!seg || seg.speaker === 'silence') continue;
+      if (seg.explicit) continue; // nunca modificar segmentos con rol explícito
+      const text: string = String(seg.text || '').toLowerCase();
+      const hasQuestion = text.includes('¿') || text.endsWith('?');
+      if (hasQuestion) {
+        // Busca la respuesta siguiente corta dentro de 15s
+        for (let j = i + 1; j < segments.length; j++) {
+          const next = segments[j];
+          if (!next || next.speaker === 'silence') continue;
+          if (next.explicit) break; // si la respuesta tiene rol explícito, no tocar
+          const gap = (next.start || 0) - (seg.end || seg.start || 0);
+          const words = String(next.text || '').trim().split(/\s+/).filter(Boolean);
+          const isShort = words.length <= 7;
+          const isAck = ackWords.some(w => String(next.text || '').toLowerCase().includes(w));
+          if (gap <= 15 && (isShort || isAck)) {
+            // Sólo volteamos si todo hasta ahora es del mismo hablante detectado
+            if (next.speaker === present) {
+              next.speaker = opposite;
+              flips++;
+            }
+            break;
+          }
+          // Si nos alejamos mucho en el tiempo, paramos la búsqueda
+          if (gap > 20) break;
+        }
+      } else {
+        // Respuestas muy cortas típicas de cliente → voltear si están marcadas como present
+        const words = String(seg.text || '').trim().split(/\s+/).filter(Boolean);
+        const isVeryShort = words.length <= 4 || ackWords.some(w => text.includes(w));
+        if (isVeryShort && seg.speaker === present) {
+          // Evita dos flips consecutivos para no crear alternancia artificial
+          const prev = segments[i - 1];
+          if (!prev || prev.speaker === present) {
+            seg.speaker = opposite;
+            flips++;
+          }
+        }
+      }
+      // Si ya hemos creado clara presencia de dos hablantes, podemos salir
+      if (flips >= 2) break;
+    }
+
+    // Si aun así no logramos dos hablantes, respetar el único presente
     return segments;
   }
 
@@ -334,5 +476,47 @@ export function useCallData(id: string | undefined) {
     isLoading,
     transcriptSegments,
     error: loadError
+  };
+}
+
+// Add the missing useCallChatMessages hook
+export function useCallChatMessages(callId: string) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchMessages = async () => {
+    if (!callId) return { data: [] };
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('call_chat_messages')
+        .select('*')
+        .eq('call_id', callId)
+        .order('timestamp', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching chat messages:', error);
+        return { data: [] };
+      }
+
+      setMessages(data || []);
+      return { data: data || [] };
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+      return { data: [] };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, [callId]);
+
+  return {
+    data: messages,
+    isLoading,
+    refetch: fetchMessages
   };
 }

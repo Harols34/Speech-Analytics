@@ -8,7 +8,7 @@ export function ChatHeader({
   apiError,
   onConfigHelp
 }: ChatHeaderProps) {
-  const isOpenAIError = apiError && (apiError.includes("OpenAI") || apiError.includes("API de OPENAI"));
+  const isOpenAIError = apiError && (apiError.toLowerCase().includes("modelo_convert-ia"));
   return <div className="glass-card dark:glass-card-dark p-4 mb-4 bg-white border rounded-md">
       <div className="flex items-center mb-2">
         <BotIcon className="h-5 w-5 text-primary mr-2" />
@@ -22,7 +22,7 @@ export function ChatHeader({
               <p className="font-medium">Error de configuración:</p>
               <p className="mt-1">{apiError}</p>
               {isOpenAIError && <Button variant="link" size="sm" className="mt-1 h-auto p-0 text-xs text-red-700" onClick={onConfigHelp}>
-                  ¿Cómo configurar la API de OpenAI?
+                  ¿Cómo configurar el Modelo_convert-IA?
                 </Button>}
             </div>
           </div>

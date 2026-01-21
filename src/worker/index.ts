@@ -73,7 +73,7 @@ app.get("/api/status/transcription", async (c) => {
   const response = {
     service: "transcription",
     status: "operational",
-    provider: "OpenAI Whisper",
+    provider: "OpenAI gpt-4o-mini-transcribe",
     features: [
       "Alta precisión en reconocimiento automático de voz",
       "Diarización basada en características acústicas",
@@ -98,7 +98,7 @@ app.get("/api/config/transcription", async (c) => {
   }
   
   const response = {
-    model: "whisper-1",
+    model: "gpt-4o-mini-transcribe",
     language: "es",
     temperature: 0,
     response_format: "verbose_json",

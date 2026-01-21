@@ -7,6 +7,7 @@ export function useAudioPlayer(audioUrl: string) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -83,6 +84,13 @@ export function useAudioPlayer(audioUrl: string) {
     }
   };
 
+  const handlePlaybackRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+    }
+  };
+
   return {
     audioRef,
     isPlaying,
@@ -90,6 +98,7 @@ export function useAudioPlayer(audioUrl: string) {
     duration,
     volume,
     isMuted,
+    playbackRate,
     controls: {
       handlePlayPause,
       handleTimeUpdate,
@@ -99,6 +108,7 @@ export function useAudioPlayer(audioUrl: string) {
       handleMute,
       handleSkipBackward,
       handleSkipForward,
+      handlePlaybackRateChange,
     }
   };
 }

@@ -79,9 +79,27 @@ export default function LoginForm({ language = "es" }: LoginFormProps) {
       if (data.session) {
         console.log("Login successful, session established");
         toast.success(language === "es" ? "Inicio de sesión exitoso" : "Login successful");
-        
-        // Navigate to analytics
-        navigate('/analytics');
+
+        // Obtener el perfil para conocer el rol y redirigir acorde
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .maybeSingle();
+
+        const role = (profile?.role as string) || 'agent';
+
+        // Redirecciones por rol
+        if (role === 'agent') {
+          navigate('/formacion');
+        } else if (role === 'superAdmin') {
+          navigate('/analytics');
+        } else if (role === 'admin' || role === 'supervisor' || role === 'qualityAnalyst' || role === 'backOffice') {
+          navigate('/analytics');
+        } else {
+          // Fallback seguro
+          navigate('/analytics');
+        }
       }
     } catch (error: any) {
       console.error("Unexpected login error:", error);

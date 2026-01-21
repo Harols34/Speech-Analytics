@@ -6,25 +6,29 @@ import { FileAudio, Upload } from "lucide-react";
 
 interface FileDropzoneProps {
   onDrop: (acceptedFiles: File[]) => void;
+  disabled?: boolean;
 }
 
-export default function FileDropzone({ onDrop }: FileDropzoneProps) {
+export default function FileDropzone({ onDrop, disabled = false }: FileDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
+    onDrop: disabled ? () => {} : onDrop,
     accept: {
       "audio/*": [".mp3", ".wav", ".m4a", ".ogg"],
     },
     maxSize: 100 * 1024 * 1024, // 100MB
+    disabled,
   });
 
   return (
     <div
       {...getRootProps()}
       className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-        isDragActive
+        disabled
+          ? "border-muted bg-muted/50 cursor-not-allowed opacity-50"
+          : isDragActive
           ? "border-primary bg-primary/5"
-          : "border-border hover:border-primary/50 hover:bg-secondary/50"
-      } cursor-pointer`}
+          : "border-border hover:border-primary/50 hover:bg-secondary/50 cursor-pointer"
+      }`}
     >
       <input {...getInputProps()} />
       <div className="flex flex-col items-center justify-center gap-2">

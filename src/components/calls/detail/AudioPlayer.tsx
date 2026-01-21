@@ -7,6 +7,7 @@ import { useAudioPlayer } from "./audio/useAudioPlayer";
 import AudioControls from "./audio/AudioControls";
 import VolumeControl from "./audio/VolumeControl";
 import AudioTimeline from "./audio/AudioTimeline";
+import PlaybackSpeedControl from "./audio/PlaybackSpeedControl";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -21,6 +22,7 @@ export default function AudioPlayer({ audioUrl, filename }: AudioPlayerProps) {
     duration,
     volume,
     isMuted,
+    playbackRate,
     controls
   } = useAudioPlayer(audioUrl);
 
@@ -56,14 +58,20 @@ export default function AudioPlayer({ audioUrl, filename }: AudioPlayerProps) {
           onSkipForward={controls.handleSkipForward}
         />
 
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={handleDownload}
-        >
-          <DownloadCloud className="mr-2 h-4 w-4" />
-          Descargar MP3
-        </Button>
+        <div className="flex items-center gap-2">
+          <PlaybackSpeedControl
+            playbackRate={playbackRate}
+            onPlaybackRateChange={controls.handlePlaybackRateChange}
+          />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleDownload}
+          >
+            <DownloadCloud className="mr-2 h-4 w-4" />
+            Descargar MP3
+          </Button>
+        </div>
       </div>
 
       {/* Hidden audio element */}

@@ -73,7 +73,7 @@ export function FeedbackAnalysisManager({
       !isGeneratingFeedback;
       
     if (shouldGenerateFeedback) {
-      console.log("Auto-triggering feedback generation");
+      console.log("Auto-triggering feedback generation for call with transcription");
       const generateFeedback = async () => {
         setIsGeneratingFeedback(true);
         try {
@@ -98,8 +98,15 @@ export function FeedbackAnalysisManager({
       setAnalysisError("No hay comportamientos activos definidos en el sistema. Agregue al menos un comportamiento activo para poder realizar el análisis.");
       return;
     }
+
+    // Verify the call has transcription
+    if (!call.transcription) {
+      toast.error("La llamada no tiene transcripción para analizar");
+      setAnalysisError("La llamada no tiene transcripción disponible. No se puede realizar el análisis de comportamientos.");
+      return;
+    }
     
-    console.log("Triggering behavior analysis for call:", call.id);
+    console.log("Triggering behavior analysis for call:", call.id, "with transcription length:", call.transcription.length);
     setIsLoadingBehaviors(true);
     setIsGeneratingFeedback(true);
     setAnalysisAttempted(true);
@@ -107,14 +114,14 @@ export function FeedbackAnalysisManager({
     
     try {
       // Show feedback to user
-      toast.loading('Generando análisis de comportamientos...', {
+      toast.loading('Analizando comportamientos basados en la transcripción real...', {
         id: 'analysis-loading'
       });
       
       const newBehaviors = await triggerBehaviorAnalysis(call.id);
       
       if (newBehaviors && newBehaviors.length > 0) {
-        console.log("Analysis generated successfully:", newBehaviors);
+        console.log("Analysis generated successfully based on real transcription:", newBehaviors);
         setBehaviors(newBehaviors);
         
         // Fetch the updated feedback data from Supabase
@@ -155,13 +162,13 @@ export function FeedbackAnalysisManager({
           }
         }
         
-        toast.success('Análisis generado correctamente', {
+        toast.success('Análisis generado correctamente basado en la transcripción', {
           id: 'analysis-loading'
         });
       } else {
         console.warn("No behaviors analysis returned");
         if (!analysisError) {
-          setAnalysisError("No se pudieron analizar comportamientos. Verifica que haya comportamientos activos y que la API de OpenAI esté configurada correctamente.");
+          setAnalysisError("No se pudieron analizar comportamientos. Verifica que haya comportamientos activos y que el Modelo_convert-IA esté configurado correctamente.");
         }
         toast.error('No se pudo generar el análisis', {
           id: 'analysis-loading',
@@ -174,7 +181,7 @@ export function FeedbackAnalysisManager({
       setAnalysisError(`Error: ${errorMessage}`);
       toast.error("Error al analizar la llamada", {
         id: 'analysis-loading',
-        description: "Verifica que la API de OpenAI esté configurada correctamente con el nombre 'API_DE_OPENAI'"
+        description: "Verifica que el Modelo_convert-IA esté configurado correctamente en el backend"
       });
     } finally {
       setIsLoadingBehaviors(false);
@@ -206,7 +213,7 @@ export function FeedbackAnalysisManager({
       // If no existing analysis and we have a transcription but no attempted analysis yet,
       // generate one automatically if we have active behaviors
       if (!existingBehaviors.length && call.transcription && hasActiveBehaviors && !analysisAttempted) {
-        console.log("No existing analysis, but have transcription. Auto-generating analysis.");
+        console.log("No existing analysis, but have transcription. Auto-generating analysis based on real content.");
         await triggerAnalysisFunction();
       } else {
         console.log("No auto-generation: hasExisting:", existingBehaviors.length > 0, 
@@ -229,6 +236,6 @@ export function FeedbackAnalysisManager({
     triggerAnalysisFunction,
     analysisError,
     hasActiveBehaviors,
-    loadBehaviorsAnalysis  // Add the loadBehaviorsAnalysis function to the return object
+    loadBehaviorsAnalysis
   };
 }

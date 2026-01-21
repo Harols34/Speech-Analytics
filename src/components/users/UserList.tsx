@@ -26,6 +26,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import UserEditModal from "./UserEditModal";
+import { CreateUserModal } from "./CreateUserModal";
+import { BulkUserUpload } from "./BulkUserUpload";
 import { Edit2, Plus, Search, Trash2, Users, RefreshCw } from "lucide-react";
 
 interface User {
@@ -139,6 +141,8 @@ export default function UserList() {
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'qualityAnalyst':
         return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'backOffice':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'supervisor':
         return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'agent':
@@ -189,10 +193,12 @@ export default function UserList() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
-              <Button size="sm" onClick={() => window.location.href = '/users/new'}>
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Usuario
-              </Button>
+              {(currentUser?.role === "superAdmin" || currentUser?.role === "admin") && (
+                <>
+                  <BulkUserUpload onUsersCreated={fetchUsers} />
+                  <CreateUserModal onUserCreated={fetchUsers} />
+                </>
+              )}
             </div>
           </div>
           

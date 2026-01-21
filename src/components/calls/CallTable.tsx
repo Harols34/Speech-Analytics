@@ -1,3 +1,4 @@
+
 import { Call } from "@/lib/types";
 import { MoreVertical, Edit, Trash2, Info } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -34,9 +35,10 @@ interface CallTableProps {
   isLoading: boolean;
   selectedCalls: string[];
   multiSelectMode: boolean;
-  onDeleteCall: (id: string) => void;
+  onDeleteCall?: (id: string) => void;
   onToggleCallSelection: (id: string) => void;
   onToggleAllCalls: (select: boolean) => void;
+  isSuperAdmin: boolean;
 }
 
 const formatDuration = (duration: number) => {
@@ -81,11 +83,13 @@ StatusBadge.displayName = 'StatusBadge';
 const ActionCell = memo(({ 
   id, 
   onDeleteCall, 
-  call 
+  call,
+  isSuperAdmin
 }: { 
   id: string; 
-  onDeleteCall: (id: string) => void;
+  onDeleteCall?: (id: string) => void;
   call: Call;
+  isSuperAdmin: boolean;
 }) => {
   const [showAnalysisInfo, setShowAnalysisInfo] = useState(false);
 
@@ -110,14 +114,18 @@ const ActionCell = memo(({
               Editar
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => onDeleteCall(id)}
-            className="text-red-500 focus:text-red-500"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Eliminar
-          </DropdownMenuItem>
+          {isSuperAdmin && onDeleteCall && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDeleteCall(id)}
+                className="text-red-500 focus:text-red-500"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -128,11 +136,10 @@ const ActionCell = memo(({
           id: call.id,
           title: call.title,
           prompts: {
-            summary: "Prompt de resumen aplicado", // This would come from actual data
-            feedback: "Prompt de feedback aplicado", // This would come from actual data
+            summary: "Prompt de resumen aplicado",
+            feedback: "Prompt de feedback aplicado",
           },
           behaviors: [
-            // This would come from actual behavior data associated with the call
             { name: "Saludo", description: "Evaluación del saludo inicial" },
             { name: "Cierre", description: "Evaluación del cierre de la llamada" }
           ]
@@ -152,9 +159,10 @@ export const CallTable = memo(({
   onDeleteCall,
   onToggleCallSelection,
   onToggleAllCalls,
+  isSuperAdmin,
 }: CallTableProps) => {
   const columns: ColumnDef<Call>[] = [
-    ...(multiSelectMode ? [
+    ...(multiSelectMode && isSuperAdmin ? [
       {
         id: "select",
         header: ({ table }) => (
@@ -225,6 +233,7 @@ export const CallTable = memo(({
           id={row.original.id} 
           onDeleteCall={onDeleteCall}
           call={row.original}
+          isSuperAdmin={isSuperAdmin}
         />
       ),
     },
@@ -281,8 +290,8 @@ export const CallTable = memo(({
             <TableRow 
               key={row.id}
               className={selectedCalls.includes(row.original.id) ? "bg-accent/30" : ""}
-              onClick={() => multiSelectMode && onToggleCallSelection(row.original.id)}
-              style={{ cursor: multiSelectMode ? "pointer" : "default" }}
+              onClick={() => multiSelectMode && isSuperAdmin && onToggleCallSelection(row.original.id)}
+              style={{ cursor: multiSelectMode && isSuperAdmin ? "pointer" : "default" }}
             >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>

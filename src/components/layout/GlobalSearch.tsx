@@ -45,7 +45,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "Operación",
       icon: "📊",
       keywords: ["analisis", "metricas", "estadisticas", "dashboard", "kpi"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"]
     },
     {
       id: "calls",
@@ -55,7 +55,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "Operación",
       icon: "📞",
       keywords: ["llamadas", "conversaciones", "grabaciones", "telefono"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"]
     },
     {
       id: "agents",
@@ -65,7 +65,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "Operación",
       icon: "👥",
       keywords: ["agentes", "vendedores", "equipo", "personal"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"]
     },
     {
       id: "workforce",
@@ -85,7 +85,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "Operación",
       icon: "🔧",
       keywords: ["herramientas", "utilidades", "procesamiento"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"]
     },
     {
       id: "chat",
@@ -95,7 +95,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "IA",
       icon: "🤖",
       keywords: ["chat", "ia", "artificial", "asistente", "bot"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"]
     },
     {
       id: "behaviors",
@@ -105,7 +105,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "IA",
       icon: "🧠",
       keywords: ["comportamientos", "patrones", "analisis", "conducta"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"]
     },
     {
       id: "tipificaciones",
@@ -115,7 +115,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "IA",
       icon: "🏷️",
       keywords: ["tipificaciones", "categorias", "etiquetas", "clasificacion"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "backOffice"]
     },
     {
       id: "prompts",
@@ -155,7 +155,7 @@ const GlobalSearch = ({ open, onOpenChange }: GlobalSearchProps) => {
       category: "Sistema",
       icon: "⚙️",
       keywords: ["configuracion", "ajustes", "perfil", "sistema"],
-      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent"]
+      requiredRoles: ["superAdmin", "admin", "qualityAnalyst", "supervisor", "agent", "backOffice"]
     }
   ];
 

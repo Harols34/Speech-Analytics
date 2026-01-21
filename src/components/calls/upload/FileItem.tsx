@@ -1,137 +1,146 @@
 
+import { FileIcon, X, CheckCircle, AlertCircle, Clock, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { X, FileAudio, Clock, CheckCircle2, AlertCircle, Upload } from "lucide-react";
 import { FileItem as FileItemType } from "./useCallUpload";
 
 interface FileItemProps {
   file: FileItemType;
   onRemove: (id: string) => void;
-  disabled: boolean;
+  isUploading: boolean;
 }
 
-export default function FileItem({ file, onRemove, disabled }: FileItemProps) {
-  const getStatusIcon = () => {
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatDuration = (seconds: number): string => {
+  if (seconds === 0) return 'Desconocida';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
+
+export default function FileItem({ file, onRemove, isUploading }: FileItemProps) {
+  const getStatusColor = () => {
     switch (file.status) {
-      case "idle":
-        return <FileAudio className="h-4 w-4 text-muted-foreground" />;
-      case "uploading":
-        return <Upload className="h-4 w-4 text-blue-500 animate-pulse" />;
-      case "uploaded":
-        return <Clock className="h-4 w-4 text-orange-500" />;
-      case "processing":
-        return <Clock className="h-4 w-4 text-yellow-500 animate-spin" />;
       case "success":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+        return "bg-green-100 text-green-700 border-green-200";
       case "error":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
+        return "bg-red-100 text-red-700 border-red-200";
+      case "duplicate":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "uploading":
+        return "bg-blue-100 text-blue-700 border-blue-200";
+      case "uploaded":
+        return "bg-purple-100 text-purple-700 border-purple-200";
+      case "processing":
+        return "bg-orange-100 text-orange-700 border-orange-200";
       default:
-        return <FileAudio className="h-4 w-4 text-muted-foreground" />;
+        return "bg-gray-100 text-gray-700 border-gray-200";
     }
   };
 
-  const getStatusColor = () => {
+  const getStatusIcon = () => {
     switch (file.status) {
-      case "idle":
-        return "secondary";
-      case "uploading":
-        return "default";
-      case "uploaded":
-        return "default";
-      case "processing":
-        return "default";
       case "success":
-        return "default";
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
       case "error":
-        return "destructive";
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      case "duplicate":
+        return <Copy className="h-4 w-4 text-yellow-600" />;
+      case "uploading":
+      case "processing":
+        return <Clock className="h-4 w-4 text-blue-600 animate-spin" />;
+      case "uploaded":
+        return <CheckCircle className="h-4 w-4 text-purple-600" />;
       default:
-        return "secondary";
+        return <FileIcon className="h-4 w-4 text-gray-600" />;
     }
   };
 
   const getStatusText = () => {
     switch (file.status) {
-      case "idle":
-        return "Pendiente";
-      case "uploading":
-        return "Subiendo";
-      case "uploaded":
-        return "Subido - Análisis en segundo plano";
-      case "processing":
-        return "Analizando";
       case "success":
         return "Completado";
       case "error":
         return "Error";
+      case "duplicate":
+        return "Duplicado";
+      case "uploading":
+        return "Subiendo";
+      case "uploaded":
+        return "Subido";
+      case "processing":
+        return "Procesando";
       default:
-        return "Desconocido";
+        return "Listo";
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const showProgressBar = file.status === "uploading" || file.status === "processing";
 
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-accent/5 transition-colors">
-      <div className="flex items-center space-x-3 flex-1 min-w-0">
-        {getStatusIcon()}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" title={file.file.name}>
-            {file.file.name}
-          </p>
-          <div className="flex items-center space-x-2 mt-1">
-            <p className="text-xs text-muted-foreground">
-              {formatFileSize(file.file.size)}
-            </p>
-            <Badge variant={getStatusColor()} className="text-xs">
-              {getStatusText()}
-            </Badge>
+    <div className={`p-4 border rounded-lg transition-all duration-200 ${getStatusColor()}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3 flex-1">
+          {getStatusIcon()}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium truncate" title={file.file.name}>
+                {file.file.name}
+              </p>
+              <Badge variant="secondary" className="text-xs">
+                {getStatusText()}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center gap-4 text-xs text-gray-600 mb-2">
+              <span>{formatFileSize(file.file.size)}</span>
+              <span>Duración: {formatDuration(file.duration || 0)}</span>
+              <span>Tipo: {file.file.type || 'Desconocido'}</span>
+            </div>
+
+            {showProgressBar && (
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${file.progress}%` }}
+                />
+              </div>
+            )}
+
+            {file.info && (
+              <p className="text-xs text-blue-600 mt-1">{file.info}</p>
+            )}
+
+            {file.error && (
+              <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                {file.error}
+              </p>
+            )}
           </div>
-          {file.info && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {file.info}
-            </p>
-          )}
-          {file.error && (
-            <p className="text-xs text-red-500 mt-1">
-              {file.error}
-            </p>
-          )}
         </div>
-      </div>
-      
-      <div className="flex items-center space-x-3">
-        {(file.status === "uploading" || file.status === "processing") && (
-          <div className="w-20">
-            <Progress value={file.progress} className="h-2" />
-            <p className="text-xs text-center text-muted-foreground mt-1">
-              {file.progress}%
-            </p>
-          </div>
+
+        {!isUploading && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(file.id)}
+            className="ml-2 h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         )}
-        
-        {file.status === "uploaded" && (
-          <div className="text-xs text-orange-600 dark:text-orange-400 text-center">
-            <Clock className="h-3 w-3 mx-auto mb-1" />
-            Análisis en progreso
-          </div>
-        )}
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRemove(file.id)}
-          disabled={disabled}
-          className="h-8 w-8 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );

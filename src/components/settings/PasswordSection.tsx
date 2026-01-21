@@ -7,17 +7,22 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useUser } from "@/hooks/useUser";
+import { useAuth } from "@/context/AuthContext";
 
 export default function PasswordSection() {
-  const { user } = useUser();
+  const { user, session } = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const handleChangePassword = async () => {
-    if (!user?.id) {
-      toast.error("Debes iniciar sesión para cambiar la contraseña");
+    console.log("Starting password change process...");
+    console.log("User:", user?.id);
+    console.log("Session:", session?.user?.id);
+    
+    if (!session?.user?.id) {
+      console.error("No session user found");
+      toast.error("No hay sesión activa. Por favor, inicia sesión nuevamente.");
       return;
     }
     
@@ -38,16 +43,22 @@ export default function PasswordSection() {
     
     setIsChangingPassword(true);
     try {
+      console.log("Calling updateUserPassword function...");
+      
       // Use the updateUserPassword edge function to change password
       const { error } = await supabase.functions.invoke('updateUserPassword', {
         body: { 
-          userId: user?.id,
+          userId: session.user.id,
           password: newPassword 
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error from updateUserPassword:", error);
+        throw error;
+      }
       
+      console.log("Password update successful");
       toast.success("Contraseña actualizada correctamente");
       setNewPassword("");
       setConfirmPassword("");

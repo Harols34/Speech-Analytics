@@ -26,8 +26,10 @@ export default function RouteObserver() {
       console.log(`Stored last path: ${location.pathname}`);
     }
     
-    // Scroll to top on route change
-    window.scrollTo(0, 0);
+    // Only scroll to top on route change if not on chat page to preserve chat state
+    if (!location.pathname.includes('/chat')) {
+      window.scrollTo(0, 0);
+    }
     
     // Send analytics event (can be extended later)
     const sendPageView = () => {

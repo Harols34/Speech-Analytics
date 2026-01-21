@@ -9,6 +9,7 @@ import FeedbackTab from "./FeedbackTab";
 import CallChatDialog from "./CallChatDialog";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/context/AuthContext";
 
 interface CallDetailTabsProps {
   call: Call;
@@ -23,6 +24,7 @@ export default function CallDetailTabs({
   const [showAIChat, setShowAIChat] = useState(false);
   const [feedbackTabMounted, setFeedbackTabMounted] = useState(false);
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   // Only mount the feedback tab when it's selected
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function CallDetailTabs({
     <>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className={`grid w-full max-w-md ${user?.role === 'agent' ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <TabsTrigger value="summary" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
               <span>Resumen</span>
@@ -44,21 +46,25 @@ export default function CallDetailTabs({
               <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
               <span>Transcripción</span>
             </TabsTrigger>
-            <TabsTrigger value="feedback" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span>Feedback IA</span>
-            </TabsTrigger>
+            {user?.role !== 'agent' && (
+              <TabsTrigger value="feedback" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span>Feedback IA</span>
+              </TabsTrigger>
+            )}
           </TabsList>
           
-          <Button 
-            variant="outline" 
-            size={isMobile ? "sm" : "sm"} 
-            onClick={() => setShowAIChat(true)} 
-            className="flex items-center gap-2 self-end sm:self-auto"
-          >
-            <MessageSquare className="h-4 w-4" />
-            <span>Consultas</span>
-          </Button>
+          {user?.role !== 'agent' && (
+            <Button 
+              variant="outline" 
+              size={isMobile ? "sm" : "sm"} 
+              onClick={() => setShowAIChat(true)} 
+              className="flex items-center gap-2 self-end sm:self-auto"
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>Consultas</span>
+            </Button>
+          )}
         </div>
 
         <TabsContent value="summary" className="mt-0 pt-2">
@@ -69,12 +75,14 @@ export default function CallDetailTabs({
           <TranscriptionTab call={call} transcriptSegments={transcriptSegments} />
         </TabsContent>
 
-        <TabsContent value="feedback" className="mt-0 pt-2">
-          {/* Only render FeedbackTab if it's been mounted */}
-          {feedbackTabMounted && (
-            <FeedbackTab call={call} />
-          )}
-        </TabsContent>
+        {user?.role !== 'agent' && (
+          <TabsContent value="feedback" className="mt-0 pt-2">
+            {/* Only render FeedbackTab if it's been mounted */}
+            {feedbackTabMounted && (
+              <FeedbackTab call={call} />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
       
       <CallChatDialog open={showAIChat} onOpenChange={setShowAIChat} call={call} />

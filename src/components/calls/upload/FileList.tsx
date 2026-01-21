@@ -1,13 +1,13 @@
 
 import { Button } from "@/components/ui/button";
-import { FileItem as FileItemType } from "../upload/useCallUpload";
+import { FileItem } from "../upload/useCallUpload";
 import FileItemComponent from "./FileItem";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Upload } from "lucide-react";
 import { memo } from "react";
 
 interface FileListProps {
-  files: FileItemType[];
+  files: FileItem[];
   onRemoveFile: (id: string) => void;
   isUploading: boolean;
   onUploadFiles: () => void;
@@ -36,7 +36,7 @@ const FileList = memo(function FileList({ files, onRemoveFile, isUploading, onUp
               key={file.id} 
               file={file} 
               onRemove={() => onRemoveFile(file.id)}
-              disabled={isUploading} 
+              isUploading={isUploading} 
             />
           ))}
         </div>

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useAccount } from "@/context/AccountContext";
 import { toast } from "sonner";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 export interface Call {
   id: string;
@@ -87,7 +88,7 @@ export function useCallList() {
         .from('calls')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500); // Aumentado para cargas masivas
 
       // Apply account filter for ALL roles
       if (selectedAccountId && selectedAccountId !== 'all') {
@@ -99,6 +100,55 @@ export function useCallList() {
       if (user.role === 'agent') {
         console.log("Agent filter applied - only showing calls for agent:", user.id);
         query = query.eq('agent_id', user.id);
+      }
+
+      // Apply dynamic filters if provided
+      if (filters) {
+        // Status
+        if (Array.isArray(filters.status) && filters.status.length > 0) {
+          query = query.in('status', filters.status);
+        }
+        // Sentiment
+        if (Array.isArray(filters.sentiment) && filters.sentiment.length > 0) {
+          query = query.in('sentiment', filters.sentiment);
+        }
+        // Result
+        if (Array.isArray(filters.result) && filters.result.length > 0) {
+          query = query.in('result', filters.result);
+        }
+        // Product
+        if (Array.isArray(filters.product) && filters.product.length > 0) {
+          query = query.in('product', filters.product);
+        }
+        // Agent
+        if (Array.isArray(filters.agent) && filters.agent.length > 0) {
+          query = query.in('agent_id', filters.agent);
+        }
+        // Date range quick filters
+        if (filters.dateRange && filters.dateRange !== 'all') {
+          let from: Date; let to: Date;
+          if (filters.dateRange === 'today') {
+            from = startOfDay(new Date());
+            to = endOfDay(new Date());
+          } else if (filters.dateRange === 'week') {
+            from = startOfWeek(new Date(), { weekStartsOn: 1 });
+            to = endOfWeek(new Date(), { weekStartsOn: 1 });
+          } else if (filters.dateRange === 'month') {
+            from = startOfMonth(new Date());
+            to = endOfMonth(new Date());
+          } else {
+            from = new Date(0);
+            to = new Date();
+          }
+          query = query.gte('created_at', from.toISOString()).lte('created_at', to.toISOString());
+        }
+        // Query text (title, agent_name, summary)
+        if (filters.query && String(filters.query).trim().length > 0) {
+          const q = String(filters.query).trim();
+          const like = `%${q}%`;
+          // Supabase OR syntax: field.ilike.value
+          query = query.or(`title.ilike.${like},agent_name.ilike.${like},summary.ilike.${like}`);
+        }
       }
 
       const { data, error: callsError } = await query.abortSignal(abortControllerRef.current.signal);
@@ -120,7 +170,8 @@ export function useCallList() {
         agentName: call.agent_name || 'Unknown',
         progress: call.status === 'complete' ? 100 : 
                  call.status === 'analyzing' ? 75 :
-                 call.status === 'transcribing' ? 50 : 25,
+                 call.status === 'transcribing' ? 50 : 
+                 call.status === 'error' ? 0 : 25,
         audioUrl: call.audio_url || '',
         audio_url: call.audio_url || '',
         status: call.status as "pending" | "transcribing" | "analyzing" | "complete" | "error",
@@ -166,41 +217,106 @@ export function useCallList() {
 
   const deleteCall = async (callId: string) => {
     try {
-      const { error } = await supabase
-        .from('calls')
-        .delete()
-        .eq('id', callId);
+      console.log('🗑️ Deleting call:', callId);
+      
+      const { data, error } = await supabase.rpc('delete_call_with_messages', {
+        call_id_param: callId
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ Function returned false');
+        throw new Error("Error al eliminar la llamada - operación falló");
+      }
 
+      console.log('✅ Call deleted successfully');
       toast.success("Llamada eliminada exitosamente");
-      lastFetchParamsRef.current = ''; // Reset to force refresh
+      
+      // Refresh data
+      lastFetchParamsRef.current = '';
       isLoadingRef.current = false;
       loadCalls();
     } catch (err: any) {
-      console.error("Error deleting call:", err);
-      toast.error("Error al eliminar la llamada");
+      console.error("❌ Error deleting call:", err);
+      toast.error("Error al eliminar la llamada", {
+        description: err.message || "Error desconocido"
+      });
     }
   };
 
   const deleteMultipleCalls = async () => {
     try {
-      const { error } = await supabase
-        .from('calls')
-        .delete()
-        .in('id', selectedCalls);
+      console.log('🗑️ Deleting multiple calls:', selectedCalls.length);
+      
+      const { data, error } = await supabase.rpc('delete_multiple_calls', {
+        call_ids: selectedCalls
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ Function returned false');
+        throw new Error("Error al eliminar las llamadas - operación falló");
+      }
 
+      console.log('✅ Multiple calls deleted successfully');
       toast.success(`${selectedCalls.length} llamadas eliminadas exitosamente`);
+      
       setSelectedCalls([]);
       setMultiSelectMode(false);
-      lastFetchParamsRef.current = ''; // Reset to force refresh
+      
+      // Refresh data
+      lastFetchParamsRef.current = '';
       isLoadingRef.current = false;
       loadCalls();
     } catch (err: any) {
-      console.error("Error deleting calls:", err);
-      toast.error("Error al eliminar las llamadas");
+      console.error("❌ Error deleting multiple calls:", err);
+      toast.error("Error al eliminar las llamadas", {
+        description: err.message || "Error desconocido"
+      });
+    }
+  };
+
+  const cleanPlatform = async () => {
+    try {
+      console.log('🧹 Cleaning platform...');
+      
+      const { data, error } = await supabase.rpc('clean_platform');
+
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ Function returned false');
+        throw new Error("Error al limpiar la plataforma - operación falló");
+      }
+
+      console.log('✅ Platform cleaned successfully');
+      toast.success("Plataforma limpiada exitosamente");
+      
+      // Reset all state
+      setCalls([]);
+      setSelectedCalls([]);
+      setMultiSelectMode(false);
+      
+      // Refresh data
+      lastFetchParamsRef.current = '';
+      isLoadingRef.current = false;
+      loadCalls();
+    } catch (err: any) {
+      console.error("❌ Error cleaning platform:", err);
+      toast.error("Error al limpiar la plataforma", {
+        description: err.message || "Verifica que tengas permisos de superAdmin"
+      });
     }
   };
 
@@ -263,6 +379,7 @@ export function useCallList() {
     toggleCallSelection,
     toggleAllCalls,
     refreshCalls,
+    cleanPlatform,
     isLoading: loading,
   };
 }

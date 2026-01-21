@@ -1,146 +1,291 @@
 
-import { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChatMessage, Call } from "@/lib/types";
-import { ChatMessageList } from "./ChatMessageList";
-import { MessageInput } from "@/components/ui/message-input";
-import { useUser } from "@/hooks/useUser";
-import { loadChatHistory, saveChatMessage, sendMessageToCallAI } from "./chatService";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Send, Loader2, Bot, User, X, AlertCircle } from "lucide-react";
+import { Call, ChatMessage } from "@/lib/types";
+import { useCallChatMessages } from "@/hooks/useCallData";
+import { sendMessageToCallAI, saveChatMessage } from "./chatService";
 import { toast } from "sonner";
+import { useLimitsCheck, canProcessChat } from "@/hooks/useLimitsCheck";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { ChatMessageItem } from "@/components/calls/detail/ChatMessage";
 
 interface CallChatDialogProps {
+  call: Call;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  call: Call;
 }
 
-export default function CallChatDialog({ open, onOpenChange, call }: CallChatDialogProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export default function CallChatDialog({ call, open, onOpenChange }: CallChatDialogProps) {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useUser();
+  const [isBlocked, setIsBlocked] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
   
-  // Load chat history when dialog opens
+  const { data: messagesData = [], refetch } = useCallChatMessages(call.id);
+  
+  // Convert the raw data to ChatMessage format and ensure it's always an array
+  const messages: ChatMessage[] = Array.isArray(messagesData) ? messagesData.map(msg => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    timestamp: msg.timestamp,
+    user_id: msg.user_id
+  })) : [];
+
+  // Verificar límites de CHAT/CONSULTAS
+  // 1) Por subtipo chat_llamada (telemetría específica)
+  const { data: callChatLimit, refetch: refetchCallChatLimit } = useLimitsCheck("chat", "chat_llamada");
+  // 2) Global de CHAT (suma general y llamada) para bloquear si el total de Consultas se supera
+  const { data: globalChatLimit, refetch: refetchGlobalChatLimit } = useLimitsCheck("chat");
+
+  // Verificar si está bloqueado por límites DE CHAT para esta cuenta específica
   useEffect(() => {
-    if (open && call.id) {
-      loadChatMessages();
+    const blockedByCallChat = !!callChatLimit?.limite_alcanzado;
+    const blockedByGlobal = !!globalChatLimit?.limite_alcanzado;
+    if (call.account_id && (blockedByCallChat || blockedByGlobal)) {
+      console.log(
+        `CallChatDialog: Account ${call.account_id} blocked due to chat limits:`,
+        { callChatLimit, globalChatLimit }
+      );
+      setIsBlocked(true);
+    } else {
+      setIsBlocked(false);
     }
-  }, [open, call.id]);
-  
-  const loadChatMessages = async () => {
-    if (!call.id) return;
-    
-    try {
-      const history = await loadChatHistory(call.id);
-      setMessages(history);
-      
-      // Si no hay historial, agregar mensaje de bienvenida específico para la llamada
-      if (history.length === 0) {
-        const initialMessage: ChatMessage = {
-          id: "welcome",
-          role: "assistant",
-          content: `👋 Hola, soy tu asistente especializado para analizar la llamada "${call.title}".
+  }, [callChatLimit, globalChatLimit, call.account_id]);
 
-Tengo acceso completo a:
-• 📞 Transcripción completa de la llamada
-• 👤 Información del agente: ${call.agentName}
-• ⏱️ Duración: ${call.duration} segundos
-• 📅 Fecha: ${new Date(call.date).toLocaleDateString()}
-• 🎯 Resultado: ${call.result || 'No especificado'}
-• 📝 Resumen de la llamada
-• 📊 Feedback y análisis de comportamientos
-• 🏷️ Tipificaciones y productos mencionados
-
-¿Qué te gustaría saber específicamente sobre esta llamada? Puedo ayudarte con:
-- Análisis detallado de la conversación
-- Evaluación del desempeño del agente
-- Identificación de oportunidades de mejora
-- Resumen de puntos clave
-- Análisis de sentimientos y emociones
-- Cumplimiento de procesos y protocolos`,
-          timestamp: new Date().toISOString(),
-          call_id: call.id
-        };
-        
-        setMessages([initialMessage]);
-        await saveChatMessage(initialMessage);
-      }
-    } catch (error) {
-      console.error("Error loading chat history:", error);
-      toast.error("Error cargando el historial de chat");
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-  
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim() || isLoading || !call.id) return;
-    
-    setInputValue("");
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isLoading || isBlocked) return;
+
+    if (!call.account_id) {
+      console.error("CallChatDialog: call.account_id is missing:", call);
+      toast.error("No se puede procesar el mensaje: cuenta no identificada");
+      return;
+    }
+
+    // VALIDACIÓN CRÍTICA: Verificar límites de CONSULTAS (global) usando función de BD
+    console.log(`CallChatDialog: Verificando límites de CONSULTAS (global) para cuenta ${call.account_id}...`);
+    const canProcess = await canProcessChat(call.account_id);
+    if (!canProcess) {
+      setIsBlocked(true);
+      toast.error("Límite de consultas alcanzado", {
+        description: "Has alcanzado el límite mensual para interacciones con el chatbot. Intenta nuevamente el próximo mes.",
+        duration: 10000,
+      });
+      return; // BLOQUEO TOTAL - No procesar el mensaje
+    }
+
     setIsLoading(true);
-    
+
     try {
-      // Agregar mensaje del usuario inmediatamente
-      const userMessage: ChatMessage = {
-        id: `temp-${Date.now()}`,
-        role: "user",
-        content: message,
-        timestamp: new Date().toISOString(),
+      console.log(`CallChatDialog: Guardando mensaje del usuario para cuenta ${call.account_id} con nuevos triggers...`);
+      const userMessage = {
         call_id: call.id,
-        user_id: user?.id
+        role: 'user',
+        content: inputValue,
+        timestamp: new Date().toISOString(),
+        user_id: user?.id || undefined,
+        account_id: call.account_id
       };
-      
-      const updatedMessages = [...messages, userMessage];
-      setMessages(updatedMessages);
-      
-      // Guardar mensaje del usuario
-      await saveChatMessage(userMessage);
-      
-      // Obtener respuesta del AI específica para la llamada
-      const aiResponse = await sendMessageToCallAI(message, updatedMessages, call);
-      
-      if (aiResponse) {
-        const aiMessage: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          role: "assistant",
-          content: aiResponse,
-          timestamp: new Date().toISOString(),
-          call_id: call.id
-        };
+
+      const { error: saveError } = await supabase
+        .from('call_chat_messages')
+        .insert(userMessage);
+
+      if (saveError) {
+        console.error('CallChatDialog: Error saving user message:', saveError);
         
-        setMessages([...updatedMessages, aiMessage]);
-        await saveChatMessage(aiMessage);
-      } else {
-        toast.error("No se pudo obtener respuesta del asistente");
+        // Detectar errores de límite del trigger (SOLO CONSULTAS) con nuevos mensajes específicos
+        if (saveError.message && 
+            (saveError.message.includes('Límite de consultas por llamada alcanzado para la cuenta') ||
+             saveError.message.includes('interacciones con el chatbot'))) {
+          
+          setIsBlocked(true);
+          toast.error("Límite de consultas alcanzado", {
+            description: "Has alcanzado el límite mensual para interacciones con el chatbot. Intenta nuevamente el próximo mes.",
+            duration: 10000,
+          });
+          return; // BLOQUEO INMEDIATO
+        }
+        
+        throw new Error(saveError.message);
       }
+
+      // VALIDACIÓN ANTES DE IA: Verificar límites de CONSULTAS (global) antes de generar respuesta de IA
+      console.log(`CallChatDialog: Verificando límites de CONSULTAS (global) antes de generar respuesta de IA para cuenta ${call.account_id}...`);
+      const stillCanProcess = await canProcessChat(call.account_id);
+      if (!stillCanProcess) {
+        setIsBlocked(true);
+        toast.error("Límite de consultas alcanzado", {
+          description: "Has alcanzado el límite mensual para interacciones con el chatbot. La IA no puede responder.",
+          duration: 10000,
+        });
+        
+        // Refrescar para mostrar el mensaje del usuario pero sin respuesta de IA
+        await refetch();
+        setInputValue("");
+        return; // BLOQUEO - No generar respuesta de IA
+      }
+
+      // Si todo está bien, proceder con la respuesta de IA
+console.log(`CallChatDialog: Generando respuesta de IA para cuenta ${call.account_id}...`);
+const aiResponse = await sendMessageToCallAI(inputValue, messages, call);
+
+if (aiResponse) {
+  const aiMessage = {
+    call_id: call.id,
+    role: 'assistant',
+    content: aiResponse,
+    timestamp: new Date().toISOString(),
+    account_id: call.account_id
+  };
+  const { error: aiSaveError } = await supabase
+    .from('call_chat_messages')
+    .insert(aiMessage);
+
+  if (aiSaveError) {
+    console.error('Error guardando la respuesta de la IA:', aiSaveError);
+    toast.error("Error guardando la respuesta de la IA");
+  }
+}
+
+setInputValue("");
+await refetch();
+      
+      // Refrescar límites después del proceso
+      await Promise.all([refetchCallChatLimit(), refetchGlobalChatLimit()]);
+      
     } catch (error) {
-      console.error("Error sending message:", error);
-      toast.error("Error enviando el mensaje");
+      console.error("CallChatDialog: Error sending message:", error);
+      
+      // Si es error de límite con nuevos mensajes específicos, no mostrar mensaje de error genérico
+      if (error instanceof Error && 
+          (error.message.includes('Límite de consultas por llamada alcanzado para la cuenta') ||
+           error.message.includes('interacciones con el chatbot'))) {
+        
+        setIsBlocked(true);
+        return;
+      }
+      
+      toast.error("Error al enviar el mensaje");
     } finally {
       setIsLoading(false);
     }
   };
-  
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>💬 Chat especializado - {call.title}</span>
-            <span className="text-sm text-muted-foreground font-normal">
-              ({call.agentName})
-            </span>
-          </DialogTitle>
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle>Chat sobre la llamada: {call.title}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-6 w-6 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
+
+        {/* Alerta de límite alcanzado SOLO PARA CONSULTAS */}
+        {isBlocked && (
+          <Alert variant="destructive" className="mx-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Límite de consultas alcanzado:</strong> Has alcanzado el límite mensual para interacciones con el chatbot. 
+              No puedes hacer más preguntas hasta el próximo mes o hasta que un administrador amplíe tu límite.
+            </AlertDescription>
+          </Alert>
+        )}
         
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
-          <ChatMessageList messages={messages} isLoading={isLoading} />
-          
-          <MessageInput
-            value={inputValue}
-            onChange={setInputValue}
-            onSend={handleSendMessage}
-            placeholder="Pregunta sobre esta llamada específica..."
-            disabled={isLoading}
-          />
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 rounded-lg mb-4 min-h-0">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full min-h-[200px]">
+                <div className="text-center">
+                  <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">Chat sobre esta llamada</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    Haz preguntas específicas sobre esta llamada. Tengo acceso a toda la información: transcripción, análisis y contexto.
+                  </p>
+                  {isBlocked && (
+                    <p className="text-sm text-red-600 mt-4">
+                      ⚠️ Límite de consultas alcanzado. Contacta al administrador.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <ChatMessageItem key={index} message={message} />
+              ))
+            )}
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <Card className="bg-white">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-5 w-5" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Analizando...</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area - Disabled when blocked */}
+          <div className="flex gap-2 flex-shrink-0">
+            <Textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={isBlocked ? "Límite de consultas alcanzado - No puedes enviar más mensajes" : "Pregunta algo específico sobre esta llamada..."}
+              className="flex-1 min-h-[60px] max-h-[120px] resize-none"
+              disabled={isLoading || isBlocked}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading || isBlocked}
+              size="lg"
+              className="px-4 h-auto min-h-[60px]"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

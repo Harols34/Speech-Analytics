@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/context/AuthContext";
+import { useCustomRoles } from "@/hooks/useCustomRoles";
 
 const formSchema = z.object({
   email: z.string().email("Ingrese un correo electrónico válido").min(1, "El correo electrónico es requerido"),
@@ -41,6 +42,7 @@ interface UserEditModalProps {
 
 export default function UserEditModal({ userId, isOpen, onClose, onSuccess }: UserEditModalProps) {
   const { user: currentUser } = useAuth();
+  const { allRoles, isLoading: rolesLoading } = useCustomRoles();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -249,13 +251,17 @@ export default function UserEditModal({ userId, isOpen, onClose, onSuccess }: Us
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {currentUser?.role === "superAdmin" && (
-                          <SelectItem value="superAdmin">Super Administrador</SelectItem>
-                        )}
-                        <SelectItem value="admin">Administrador</SelectItem>
-                        <SelectItem value="qualityAnalyst">Analista de Calidad</SelectItem>
-                        <SelectItem value="supervisor">Supervisor</SelectItem>
-                        <SelectItem value="agent">Agente</SelectItem>
+                        {allRoles.map((role) => {
+                          if (role.value === 'superAdmin' && currentUser?.role !== 'superAdmin') {
+                            return null;
+                          }
+                          return (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                              {role.isCustom && ' (Personalizado)'}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     <FormMessage />

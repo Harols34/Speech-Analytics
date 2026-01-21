@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useAccount } from "@/context/AccountContext";
 import { ChatHistoryItem } from "@/lib/types";
 
 export default function ChatHistory() {
@@ -22,10 +24,36 @@ export default function ChatHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const { selectedAccountId } = useAccount();
 
   useEffect(() => {
     fetchChatHistory();
+  }, [selectedAccountId]);
+
+  // Listen for account changes and refresh data
+  useEffect(() => {
+    const handleAccountChange = () => {
+      fetchChatHistory();
+    };
+    
+    window.addEventListener('accountChanged', handleAccountChange);
+    return () => window.removeEventListener('accountChanged', handleAccountChange);
   }, []);
+
+  // Persist search per account
+  const storageKey = selectedAccountId ? `chat_history_search_${selectedAccountId}` : null;
+  useEffect(() => {
+    if (storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) setSearchTerm(saved);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (storageKey) {
+      localStorage.setItem(storageKey, searchTerm);
+    }
+  }, [searchTerm, storageKey]);
 
   useEffect(() => {
     if (searchTerm) {
@@ -41,6 +69,13 @@ export default function ChatHistory() {
   }, [searchTerm, history]);
 
   const fetchChatHistory = async () => {
+    if (!selectedAccountId) {
+      setHistory([]);
+      setFilteredHistory([]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       
@@ -48,11 +83,12 @@ export default function ChatHistory() {
       const fifteenDaysAgo = new Date();
       fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
-      // Usar la tabla chat_messages para el chat global
+      // Cargar historial COMPARTIDO para toda la cuenta (sin filtrar por user_id)
       const { data, error } = await supabase
         .from("chat_messages")
         .select("*")
-        .eq("user_id", user?.id)
+        .eq("account_id", selectedAccountId)
+        // NO filtrar por user_id para mostrar historial compartido
         .gte("timestamp", fifteenDaysAgo.toISOString())
         .order("timestamp", { ascending: false });
 
@@ -72,7 +108,7 @@ export default function ChatHistory() {
             const assistantResponse = data.find(
               resp => resp.role === "assistant" && 
                      resp.timestamp > message.timestamp &&
-                     Math.abs(new Date(resp.timestamp).getTime() - new Date(message.timestamp).getTime()) < 60000 // Within 1 minute
+                     Math.abs(new Date(resp.timestamp).getTime() - new Date(message.timestamp).getTime()) < 300000 // Within 5 minutes
             );
             
             if (assistantResponse) {
@@ -146,9 +182,14 @@ export default function ChatHistory() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Historial de Consultas
-        </h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Historial de Consultas (Compartido)
+          </h2>
+            <p className="text-sm text-foreground">
+              Historial compartido para toda la cuenta seleccionada
+            </p>
+        </div>
       </div>
 
       <div className="relative mb-4">
@@ -168,10 +209,10 @@ export default function ChatHistory() {
             <h3 className="text-xl font-medium">
               No hay conversaciones guardadas
             </h3>
-            <p className="text-muted-foreground max-w-md">
+            <p className="text-foreground max-w-md">
               {searchTerm
                 ? "No se encontraron resultados para tu búsqueda"
-                : "Todas tus conversaciones con el asistente aparecerán aquí"}
+                : "Todas las conversaciones compartidas de esta cuenta aparecerán aquí"}
             </p>
             {searchTerm && (
               <Button

@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
 const userSettingsSchema = z.object({
-  transcription_model: z.string().default('openai-whisper'),
+  transcription_model: z.string().default('gpt-4o-mini-transcribe'),
   analysis_model: z.string().default('gpt-4o'),
   openai_api_key: z.string().optional(),
   speaker_diarization: z.boolean().default(true),
@@ -33,7 +33,7 @@ export default function UserSettings() {
   const form = useForm<UserSettingsFormValues>({
     resolver: zodResolver(userSettingsSchema),
     defaultValues: {
-      transcription_model: settings?.transcription_model || 'openai-whisper',
+      transcription_model: settings?.transcription_model || 'gpt-4o-mini-transcribe',
       analysis_model: settings?.analysis_model || 'gpt-4o',
       openai_api_key: settings?.openai_api_key || '',
       speaker_diarization: settings?.speaker_diarization ?? true,
@@ -46,7 +46,7 @@ export default function UserSettings() {
   React.useEffect(() => {
     if (settings) {
       form.reset({
-        transcription_model: settings.transcription_model || 'openai-whisper',
+        transcription_model: settings.transcription_model || 'gpt-4o-mini-transcribe',
         analysis_model: settings.analysis_model || 'gpt-4o',
         openai_api_key: settings.openai_api_key || '',
         speaker_diarization: settings.speaker_diarization ?? true,
@@ -75,19 +75,19 @@ export default function UserSettings() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Configuración de OpenAI</CardTitle>
-            <CardDescription>
-              Configura tu clave de API de OpenAI para funcionalidades de IA
-            </CardDescription>
-          </CardHeader>
+        <CardHeader>
+          <CardTitle>Configuración del Modelo_convert-IA</CardTitle>
+          <CardDescription>
+            Configura tu clave del Modelo_convert-IA para funcionalidades de IA
+          </CardDescription>
+        </CardHeader>
           <CardContent className="space-y-4">
             <FormField
               control={form.control}
               name="openai_api_key"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Clave de API de OpenAI</FormLabel>
+                  <FormLabel>Clave del Modelo_convert-IA</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -112,7 +112,7 @@ export default function UserSettings() {
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Tu clave de API de OpenAI se almacena de forma segura y solo es visible para ti.
+                    Tu clave del Modelo_convert-IA se almacena de forma segura y solo es visible para ti.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -142,7 +142,8 @@ export default function UserSettings() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="openai-whisper">OpenAI Whisper</SelectItem>
+              <SelectItem value="gpt-4o-mini-transcribe">Modelo_Voz_convert-IA</SelectItem>
+                      <SelectItem value="gpt-4o-mini-transcribe">Modelo_Voz_convert-IA</SelectItem>
                       <SelectItem value="azure-speech">Azure Speech</SelectItem>
                       <SelectItem value="google-speech">Google Speech</SelectItem>
                     </SelectContent>

@@ -2,8 +2,10 @@ import React, { useState, useMemo } from "react";
 import { Call } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Volume, VolumeX, User, UserRound, Clock, Search } from "lucide-react";
+import { FileText, Volume, VolumeX, User, UserRound, Clock, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface TranscriptionTabProps {
   call: Call;
@@ -12,6 +14,7 @@ interface TranscriptionTabProps {
 
 export default function TranscriptionTab({ call, transcriptSegments }: TranscriptionTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSilences, setShowSilences] = useState(false);
   
   // Calculate speaker statistics if available
   const speakerStats = call.speaker_analysis || null;
@@ -249,41 +252,59 @@ export default function TranscriptionTab({ call, transcriptSegments }: Transcrip
           </div>
         </div>
 
-        {/* Silence summary section - Enhanced with detailed information */}
+        {/* Silence summary section - Collapsible */}
         {silences.length > 0 && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
-            <h4 className="text-sm font-medium flex items-center mb-2 text-yellow-800 dark:text-yellow-300">
-              <Clock className="h-4 w-4 mr-2" />
-              Silencios prolongados detectados
-            </h4>
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 text-xs font-medium text-yellow-700 dark:text-yellow-400 mb-1">
-                <div className="col-span-1">#</div>
-                <div className="col-span-4">Inicio</div>
-                <div className="col-span-4">Fin</div>
-                <div className="col-span-3">Duración</div>
-              </div>
-              {silences.map((silence, idx) => (
-                <div key={idx} className="grid grid-cols-12 text-sm items-center">
-                  <div className="col-span-1 text-yellow-700 dark:text-yellow-400">
-                    {idx + 1}
+          <Collapsible open={showSilences} onOpenChange={setShowSilences}>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="w-full flex items-center justify-between p-4 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 rounded-md"
+                >
+                  <div className="flex items-center text-yellow-800 dark:text-yellow-300">
+                    <Clock className="h-4 w-4 mr-2" />
+                    <span className="font-medium text-sm">
+                      {silences.length} silencios prolongados ({formatDuration(speakingTimeStats.silenceTime)})
+                    </span>
                   </div>
-                  <div className="col-span-4 font-medium">
-                    {formatTime(silence.start)}
+                  {showSilences ? (
+                    <ChevronUp className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-4 pb-4 space-y-2">
+                  <div className="grid grid-cols-12 text-xs font-medium text-yellow-700 dark:text-yellow-400 mb-1">
+                    <div className="col-span-1">#</div>
+                    <div className="col-span-4">Inicio</div>
+                    <div className="col-span-4">Fin</div>
+                    <div className="col-span-3">Duración</div>
                   </div>
-                  <div className="col-span-4 font-medium">
-                    {formatTime(silence.end)}
-                  </div>
-                  <div className="col-span-3 text-yellow-600 dark:text-yellow-400">
-                    {Math.round(silence.duration)}s
+                  {silences.map((silence, idx) => (
+                    <div key={idx} className="grid grid-cols-12 text-sm items-center">
+                      <div className="col-span-1 text-yellow-700 dark:text-yellow-400">
+                        {idx + 1}
+                      </div>
+                      <div className="col-span-4 font-medium">
+                        {formatTime(silence.start)}
+                      </div>
+                      <div className="col-span-4 font-medium">
+                        {formatTime(silence.end)}
+                      </div>
+                      <div className="col-span-3 text-yellow-600 dark:text-yellow-400">
+                        {Math.round(silence.duration)}s
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-xs text-yellow-600 dark:text-yellow-500 mt-2">
+                    Los silencios prolongados pueden indicar dudas, confusión o búsqueda de información. Se detectan silencios de 2+ segundos.
                   </div>
                 </div>
-              ))}
-              <div className="text-xs text-yellow-600 dark:text-yellow-500 mt-2">
-                Los silencios prolongados pueden indicar dudas, confusión o búsqueda de información. Se detectan silencios de 2+ segundos.
-              </div>
+              </CollapsibleContent>
             </div>
-          </div>
+          </Collapsible>
         )}
 
         {/* Search input */}

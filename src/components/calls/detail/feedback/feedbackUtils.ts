@@ -62,7 +62,7 @@ export async function triggerBehaviorAnalysis(callId: string): Promise<BehaviorA
       console.error("Error invoking analyze-call function:", functionError);
       toast.error("Error al analizar comportamientos", { 
         id: "analyze-call",
-        description: functionError.message || "Verifica la configuración de la API de OpenAI"
+        description: functionError.message || "Verifica la configuración del Modelo_convert-IA en el backend"
       });
       throw new Error(functionError.message || "Error al analizar comportamientos");
     }

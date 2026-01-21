@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "./context/AuthContext";
 import { AccountProvider } from "./context/AccountContext";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { RoleBasedRoute } from "@/components/training/RoleBasedRoute";
 
 // Pages
 import Index from "./pages/Index";
@@ -23,10 +25,14 @@ import Prompts from "./pages/Prompts";
 import Users from "./pages/Users";
 import AccountsPage from "./pages/Accounts";
 import Settings from "./pages/Settings";
+import Limits from "./pages/Limits";
 import NotFound from "./pages/NotFound";
-import CreateUser from "./pages/CreateUser";
 import CreateAccount from "./pages/CreateAccount";
 import AssignUsers from "./pages/AssignUsers";
+import Facturacion from "./pages/Facturacion";
+import AdminFormacion from "./pages/AdminFormacion";
+import Formacion from "./pages/Formacion";
+import Permissions from "./pages/Permissions";
 
 import "./App.css";
 
@@ -60,21 +66,159 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/login" element={<Login />} />
-                      <Route path="/analytics" element={<Analytics />} />
-                      <Route path="/calls/*" element={<Calls />} />
-                      <Route path="/agents" element={<Agents />} />
-                      <Route path="/workforce" element={<Workforce />} />
-                      <Route path="/tools" element={<Tools />} />
-                      <Route path="/chat" element={<Chat />} />
-                      <Route path="/behaviors" element={<Behaviors />} />
-                      <Route path="/tipificaciones" element={<Tipificaciones />} />
-                      <Route path="/prompts/*" element={<Prompts />} />
-                      <Route path="/users/*" element={<Users />} />
-                      <Route path="/accounts/*" element={<AccountsPage />} />
-                      <Route path="/accounts/new" element={<CreateAccount />} />
-                      <Route path="/accounts/assign" element={<AssignUsers />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/dashboard" element={<Navigate to="/analytics" replace />} />
+                      
+                      {/* Rutas Protegidas por Autenticación + Permisos por Módulo */}
+                      <Route path="/analytics" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="analytics">
+                            <Analytics />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/calls/*" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="calls">
+                            <Calls />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/agents" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="agents">
+                            <Agents />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/workforce" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="workforce">
+                            <Workforce />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/tools" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="tools">
+                            <Tools />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/chat/*" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="chat">
+                            <Chat />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/behaviors/*" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="behaviors">
+                            <Behaviors />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/tipificaciones" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="tipificaciones">
+                            <Tipificaciones />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/prompts/*" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="prompts">
+                            <Prompts />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/users" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="users">
+                            <Users />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/accounts/*" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="accounts">
+                            <AccountsPage />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/accounts/new" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="accounts">
+                            <CreateAccount />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/accounts/assign" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="accounts">
+                            <AssignUsers />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/facturacion" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="facturacion">
+                            <Facturacion />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/limits" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="limits">
+                            <Limits />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/admin-formacion" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="admin-formacion">
+                            <AdminFormacion />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/formacion" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="formacion">
+                            <Formacion />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/permissions" element={
+                        <ProtectedRoute>
+                          <RoleBasedRoute moduleName="permissions">
+                            <Permissions />
+                          </RoleBasedRoute>
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/settings" element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      } />
+                      
+                      <Route path="/dashboard" element={<Navigate to="/" replace />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </div>

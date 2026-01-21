@@ -13,10 +13,13 @@ const CreateHaroldUser: React.FC = () => {
     setIsCreating(true);
     
     try {
+      // Generate a secure random password
+      const securePassword = `Harold${Math.random().toString(36).slice(-8)}*${Date.now().toString().slice(-3)}`;
+      
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: 'harold.alvarez@convertia.com',
-          password: 'Harold123*',
+          password: securePassword,
           fullName: 'harold sneid',
           role: 'agent',
           accountNames: ['Claro', 'Tigo']

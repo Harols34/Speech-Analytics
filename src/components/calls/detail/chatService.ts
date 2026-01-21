@@ -47,6 +47,18 @@ export async function saveChatMessage(message: ChatMessage): Promise<boolean> {
   if (!message.call_id) return false;
 
   try {
+    // Obtener account_id de la llamada
+    const { data: callData, error: callError } = await supabase
+      .from('calls')
+      .select('account_id')
+      .eq('id', message.call_id)
+      .single();
+
+    if (callError || !callData?.account_id) {
+      console.error("Error getting call data or account_id missing:", callError, callData);
+      return false;
+    }
+
     const response: any = await supabase
       .from('call_chat_messages')
       .insert({
@@ -54,7 +66,8 @@ export async function saveChatMessage(message: ChatMessage): Promise<boolean> {
         role: message.role,
         call_id: message.call_id,
         timestamp: new Date().toISOString(),
-        user_id: message.user_id
+        user_id: message.user_id,
+        account_id: callData.account_id
       });
     
     if (response.error) {
@@ -75,16 +88,54 @@ export async function sendMessageToCallAI(
   call: Call
 ): Promise<string | null> {
   try {
+    // BLOQUEO GLOBAL por límite de consultas ANTES de llamar a la función Edge
+    try {
+      const { data, error } = await supabase.rpc('can_chat_for_account', {
+        p_account_id: call.account_id,
+        p_subtipo: null
+      });
+      if (error) {
+        console.warn('sendMessageToCallAI: no se pudo verificar límite global de consultas:', error);
+      } else if (data === false) {
+        throw new Error('Límite de consultas alcanzado');
+      }
+    } catch (e) {
+      // Si falla la verificación pero no es negativo explícito, continuamos
+    }
+
     // Preparar transcripción completa
     let transcriptText = "";
     if (call.transcription) {
       try {
-        const transcriptSegments = typeof call.transcription === 'string' 
-          ? JSON.parse(call.transcription) 
-          : call.transcription;
-          
-        if (Array.isArray(transcriptSegments)) {
-          transcriptText = transcriptSegments.map(segment => {
+        // Si la transcripción es un string, intentar parsearlo como JSON primero
+        if (typeof call.transcription === 'string') {
+          // Verificar si parece ser JSON (comienza con [ o {)
+          if (call.transcription.trim().startsWith('[') || call.transcription.trim().startsWith('{')) {
+            try {
+              const transcriptSegments = JSON.parse(call.transcription);
+              if (Array.isArray(transcriptSegments)) {
+                transcriptText = transcriptSegments.map(segment => {
+                  const speakerLabel = segment.speaker === "agent" 
+                    ? "Asesor: " 
+                    : segment.speaker === "client" 
+                    ? "Cliente: " 
+                    : "Silencio: ";
+                  return speakerLabel + segment.text;
+                }).join('\n');
+              } else {
+                transcriptText = String(call.transcription);
+              }
+            } catch (jsonError) {
+              // Si falla el parsing JSON, usar el string directamente
+              transcriptText = String(call.transcription);
+            }
+          } else {
+            // Si no parece JSON, usar directamente
+            transcriptText = String(call.transcription);
+          }
+        } else if (Array.isArray(call.transcription)) {
+          // Si ya es un array, procesarlo directamente
+          transcriptText = (call.transcription as any[]).map((segment: any) => {
             const speakerLabel = segment.speaker === "agent" 
               ? "Asesor: " 
               : segment.speaker === "client" 
@@ -96,7 +147,7 @@ export async function sendMessageToCallAI(
           transcriptText = String(call.transcription);
         }
       } catch (error) {
-        console.error("Error parsing transcript:", error);
+        console.error("Error processing transcript:", error);
         transcriptText = String(call.transcription);
       }
     }
